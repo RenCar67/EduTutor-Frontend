@@ -1,0 +1,72 @@
+Actúa como un Desarrollador Frontend Senior y Diseñador UI/UX especializado en aplicaciones SaaS educativas. Tu misión es construir la aplicación web completa para la plataforma "EduTutor" (Caso 5), basada en una arquitectura de microservicios en Spring Boot gobernada por un Backend-for-Frontend (BFF).
+
+---
+
+### 1. STACK TECNOLÓGICO Y DISEÑO
+- Framework: React 18+ (Vite) o Next.js (App Router) con TypeScript.
+- Estilos y Componentes: Tailwind CSS, componentes tipo shadcn/ui (Cards, Badges, Modals, Tables, Tabs, Selects, Dialogs), animaciones suaves con Lucide Icons.
+- Visualización de Datos: Recharts o Chart.js para dashboards de telemetría y métricas.
+- Manejo de Estado y Conectividad: Axios con interceptores y TanStack Query (React Query) para caché y reintentos.
+- Notificaciones: Sonner o React Hot Toast para feedback de acciones, errores y confirmaciones.
+- Estética: Interfaz SaaS moderna, paleta de colores sobria y elegante (azul marino pizarra `#0f172a`, índigo `#6366f1` y acentos esmeralda/ámbar), tipografía Inter o Geist, soporte responsivo para escritorio y móvil.
+
+---
+
+### 2. ARQUITECTURA DE CONECTIVIDAD (BFF PATTERN)
+- Regla Cero: La aplicación NUNCA consulta directamente a los microservicios de catálogo, sesiones o reportes. TODO el tráfico viaja exclusivamente hacia el BFF (`ms-edututor-bff`) o a través de la URL base configurada en variables de entorno:
+  `VITE_API_BASE_URL` o `NEXT_PUBLIC_API_BASE_URL` (por defecto `http://localhost:8080/api/v1` o ruta homologada).
+- Headers de Contexto / Autenticación:
+  Configurar un interceptor en Axios para enviar las cabeceras requeridas por la seguridad del BFF:
+  - `X-User-Id` (configurable desde un selector de usuario o sesión simulada).
+  - `X-User-Role` (estudiante, tutor, admin).
+- MOCK FALLBACK OBLIGATORIO:
+  Crea un interruptor (`Mock Mode: ON/OFF`) visible en la barra superior o footer. Si el backend en AWS/local no está alcanzable o falla la red, la aplicación debe operar de forma transparente con datos mock enriquecidos basados en los contratos de datos de los repositorios.
+
+---
+
+### 3. CONTRATOS DE DATOS Y MÓDULOS DE LA APLICACIÓN
+
+La aplicación debe estructurarse en una navegación lateral (Sidebar) con 4 módulos principales:
+
+#### Módulo 1: Catálogo de Servicios (`ms-edututor-catalog` vía BFF)
+- Datos del Modelo (`Servicio`): `id`, `nombre`, `descripcion`, `categoria`, `tutorNombre`, `precioHora`, `duracionMinutos`, `estado`.
+- Funcionalidad:
+  - Vista en cuadrícula (Cards) de tutorías disponibles con buscador en vivo y filtros por categoría/precio.
+  - Modal interactivo con el detalle del servicio y botón destacado "Agendar Tutoría", el cual abre un asistente para reservar y enlazar con el módulo de sesiones.
+
+#### Módulo 2: Gestión de Sesiones (`ms-edututor-sessions` vía BFF)
+- Datos del Modelo (`Sesion` y `EstadoSesion`):
+  - Campos: `id`, `servicioId`, `estudianteId`, `tutorId`, `fechaHora`, `estado`, `observaciones`.
+  - Estados admitidos: `AGENDADA`, `CONFIRMADA`, `EN_CURSO`, `FINALIZADA`, `CANCELADA`.
+- Funcionalidad:
+  - Vista de calendario o lista kanban/tabla de sesiones activas e históricas.
+  - Flujo de Transición de Estados: Botones contextuales con validación para cambiar de estado (ej: de AGENDADA a CONFIRMADA, de CONFIRMADA a EN_CURSO, de EN_CURSO a FINALIZADA).
+  - Manejo de excepciones: Si el backend responde con error de transición ilegal (`IllegalStateTransitionException`), mostrar una alerta descriptiva al usuario indicando por qué el flujo es inválido.
+  - Creación de nueva sesión con formulario validado.
+
+#### Módulo 3: Centro de Analítica y Reportes (`ms-edututor-report` vía BFF)
+- Datos del Modelo:
+  - `EstadoGauge`: Medidores de sesiones por estado (activas, finalizadas, canceladas).
+  - `MetricaHora`: Horas pico con mayor concentración de tutorías (`hora`, `totalSesiones`, `tasaExito`).
+  - `MetricaServicioDia`: Tendencia diaria por tipo de servicio (`fecha`, `servicioId`, `ingresos`, `sesionesTotales`).
+- Componentes Visuales:
+  - Tarjetas KPI con porcentajes y variaciones respecto al día anterior.
+  - Gráfico de barras o líneas de demanda por hora del día.
+  - Gráfico circular / dona de distribución de estados de sesiones.
+  - Tabla desglosada de métricas diarias con opción de exportación a CSV/JSON.
+
+#### Módulo 4: Bitácora de Auditoría y Eventos (`ms-edututor-audit` vía BFF)
+- Datos del Modelo (`EventoAuditoria`): `id`, `eventoTipo`, `origen`, `usuario`, `fechaTimestamp`, `payloadJson`, `resultado`.
+- Funcionalidad:
+  - Tabla de auditoría en tiempo real para perfiles administrativos.
+  - Filtros avanzados por tipo de evento (creación de sesión, cambio de estado, cancelaciones) y rango de fechas.
+  - Visor modal de JSON formateado y resaltado de sintaxis para inspeccionar el detalle del payload de cada evento publicado por Kafka/RabbitMQ.
+
+---
+
+### 4. REQUISITOS DE EXPERIENCIA DE USUARIO (UX)
+- Estados de Carga: Skeletons en tablas y tarjetas mientras se resuelven las peticiones HTTP.
+- Manejo de Errores: Mensajes descriptivos en caso de caída del servidor o códigos 4xx/5xx con botón para reintentar (`Retry`).
+- Selectores de Simulación: Un widget colapsable en la esquina superior para alternar rápidamente el rol (`Estudiante`, `Tutor`, `Administrador`) y probar los distintos permisos de visualización.
+
+Entrega una estructura de código limpia, modular, con TypeScript estricto y componentes listos para desplegar en Replit.

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "EduTutor"
+description = "Plataforma SaaS educativa para descubrir tutorías, gestionar sesiones, revisar métricas y auditar eventos desde una sola consola."
+version = "1.0.0"
+id = "artifacts/edututor"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24373
+
+[services.development]
+run = "pnpm --filter @workspace/edututor run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/edututor", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/edututor/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24373"
+BASE_PATH = "/"

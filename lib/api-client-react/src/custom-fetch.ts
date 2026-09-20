@@ -8,6 +8,11 @@ export type BodyType<T> = T;
 
 export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
+export type RequestContext = {
+  userId: string;
+  userRole: string;
+};
+
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
@@ -17,6 +22,11 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _requestContext: RequestContext | null = null;
+
+export function setRequestContext(context: RequestContext | null): void {
+  _requestContext = context;
+}
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -336,6 +346,11 @@ export async function customFetch<T = unknown>(
   }
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+
+  if (_requestContext) {
+    headers.set("X-User-Id", _requestContext.userId);
+    headers.set("X-User-Role", _requestContext.userRole);
+  }
 
   if (
     typeof init.body === "string" &&

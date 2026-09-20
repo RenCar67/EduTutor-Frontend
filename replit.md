@@ -1,6 +1,6 @@
-# [Project name]
+# EduTutor
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Plataforma SaaS educativa para descubrir tutorías, gestionar sesiones, revisar métricas y auditar eventos desde una sola consola.
 
 ## Run & Operate
 
@@ -19,26 +19,42 @@ _Replace the heading above with the project's name, and this line with one sente
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
+- Frontend: React + Vite, Tailwind CSS, Wouter, TanStack Query, Recharts-ready workspace
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/edututor/src/` — responsive EduTutor console, shared shell, local demo data and module pages
+- `artifacts/api-server/src/routes/edututor.ts` — BFF endpoints and enriched in-memory demo contracts
+- `lib/api-spec/openapi.yaml` — source of truth for catalog, sessions, analytics and audit contracts
+- `lib/api-client-react/src/custom-fetch.ts` — generated client transport with configurable user context headers
+- `lib/api-zod/src/generated/` and `lib/api-client-react/src/generated/` — generated validation/types and React Query hooks
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The web app only calls `/api/v1/*` through the BFF contract; microservice boundaries remain behind the API server.
+- Mock Mode is enabled by default and uses a richer local dataset so the UI remains demonstrable without a reachable backend.
+- Live API requests include `X-User-Id` and `X-User-Role` from the simulated role selector through the shared fetch transport.
+- Session lifecycle transitions are validated in the BFF and return a descriptive 409 for illegal transitions.
+- The first build uses in-memory BFF data to keep the demo self-contained; PostgreSQL can replace the store without changing the frontend contract.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Dashboard with operational KPIs, hourly demand, state distribution and active-session context
+- Searchable catalog with category/price filters and scheduling flow
+- Session operations table with create flow and validated lifecycle transitions
+- Analytics view with hourly/daily metrics and CSV export
+- Audit view with event filters and expandable JSON payloads
+- Responsive shell with role simulation and Mock Mode ON/OFF
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+No project-specific preferences recorded.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run `pnpm --filter @workspace/api-spec run codegen` after changing `lib/api-spec/openapi.yaml`.
+- The frontend artifact workflow supplies `PORT` and `BASE_PATH`; use the managed workflow for previews.
+- The API server owns `/api`, while the frontend consumes `/api/v1/...` through the shared proxy.
 
 ## Pointers
 

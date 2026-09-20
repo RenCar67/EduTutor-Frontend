@@ -3,13 +3,21 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: BFF contract for the EduTutor educational tutoring platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: catalog
+    description: Tutoring service catalog
+  - name: sessions
+    description: Tutoring session lifecycle
+  - name: analytics
+    description: Session and revenue analytics
+  - name: audit
+    description: Audit trail events
 paths:
   /healthz:
     get:
@@ -24,6 +32,175 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /v1/services:
+    get:
+      operationId: listServices
+      tags: [catalog]
+      summary: List tutoring services
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: maxPrice
+          in: query
+          required: false
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Available services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Servicio"
+  /v1/sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List tutoring sessions
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/EstadoSesion"
+        - name: studentId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sesion"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Schedule a tutoring session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SesionInput"
+      responses:
+        "201":
+          description: Created session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sesion"
+  /v1/sessions/{id}/status:
+    patch:
+      operationId: transitionSession
+      tags: [sessions]
+      summary: Transition a session status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionStatusInput"
+      responses:
+        "200":
+          description: Updated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sesion"
+        "409":
+          description: Illegal state transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/analytics/summary:
+    get:
+      operationId: getAnalyticsSummary
+      tags: [analytics]
+      summary: Get dashboard KPI summary
+      responses:
+        "200":
+          description: Summary metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsSummary"
+  /v1/analytics/hourly:
+    get:
+      operationId: getHourlyMetrics
+      tags: [analytics]
+      summary: Get demand by hour
+      responses:
+        "200":
+          description: Hourly demand
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetricaHora"
+  /v1/analytics/daily:
+    get:
+      operationId: getDailyMetrics
+      tags: [analytics]
+      summary: Get daily service metrics
+      responses:
+        "200":
+          description: Daily metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetricaServicioDia"
+  /v1/audit-events:
+    get:
+      operationId: listAuditEvents
+      tags: [audit]
+      summary: List audit events
+      parameters:
+        - name: eventType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventoAuditoria"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +210,89 @@ components:
           type: string
       required:
         - status
+    EstadoSesion:
+      type: string
+      enum: [AGENDADA, CONFIRMADA, EN_CURSO, FINALIZADA, CANCELADA]
+    Servicio:
+      type: object
+      required: [id, nombre, descripcion, categoria, tutorNombre, precioHora, duracionMinutos, estado]
+      properties:
+        id: { type: string }
+        nombre: { type: string }
+        descripcion: { type: string }
+        categoria: { type: string }
+        tutorNombre: { type: string }
+        precioHora: { type: number }
+        duracionMinutos: { type: integer }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    Sesion:
+      type: object
+      required: [id, servicioId, estudianteId, tutorId, tutorNombre, servicioNombre, fechaHora, estado, observaciones]
+      properties:
+        id: { type: string }
+        servicioId: { type: string }
+        estudianteId: { type: string }
+        tutorId: { type: string }
+        tutorNombre: { type: string }
+        servicioNombre: { type: string }
+        fechaHora: { type: string, format: date-time }
+        estado: { $ref: "#/components/schemas/EstadoSesion" }
+        observaciones: { type: string }
+    SesionInput:
+      type: object
+      required: [servicioId, estudianteId, tutorId, fechaHora]
+      properties:
+        servicioId: { type: string }
+        estudianteId: { type: string }
+        tutorId: { type: string }
+        fechaHora: { type: string, format: date-time }
+        observaciones: { type: string }
+    SessionStatusInput:
+      type: object
+      required: [estado]
+      properties:
+        estado: { $ref: "#/components/schemas/EstadoSesion" }
+    AnalyticsSummary:
+      type: object
+      required: [activeSessions, completedSessions, cancelledSessions, weeklyRevenue, successRate, sessionsChange, revenueChange]
+      properties:
+        activeSessions: { type: integer }
+        completedSessions: { type: integer }
+        cancelledSessions: { type: integer }
+        weeklyRevenue: { type: number }
+        successRate: { type: number }
+        sessionsChange: { type: number }
+        revenueChange: { type: number }
+    MetricaHora:
+      type: object
+      required: [hora, totalSesiones, tasaExito]
+      properties:
+        hora: { type: string }
+        totalSesiones: { type: integer }
+        tasaExito: { type: number }
+    MetricaServicioDia:
+      type: object
+      required: [fecha, servicioId, servicioNombre, ingresos, sesionesTotales]
+      properties:
+        fecha: { type: string, format: date }
+        servicioId: { type: string }
+        servicioNombre: { type: string }
+        ingresos: { type: number }
+        sesionesTotales: { type: integer }
+    EventoAuditoria:
+      type: object
+      required: [id, eventoTipo, origen, usuario, fechaTimestamp, payloadJson, resultado]
+      properties:
+        id: { type: string }
+        eventoTipo: { type: string }
+        origen: { type: string }
+        usuario: { type: string }
+        fechaTimestamp: { type: string, format: date-time }
+        payloadJson: { type: object, additionalProperties: true }
+        resultado: { type: string, enum: [EXITOSO, ERROR] }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
 
