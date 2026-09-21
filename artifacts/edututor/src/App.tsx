@@ -6,12 +6,17 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { AppShell, WorkspaceProvider } from '@/components/app-shell';
 import { AnalyticsPage, AuditPage, CatalogPage, DashboardPage, SessionsPage } from '@/pages/console';
+import { setBaseUrl } from '@workspace/api-client-react';
 import {
   Route,
   Switch,
   useLocation,
   Router as WouterRouter,
 } from 'wouter';
+
+if (import.meta.env.VITE_API_BASE_URL) {
+  setBaseUrl(import.meta.env.VITE_API_BASE_URL);
+}
 
 const queryClient = new QueryClient();
 

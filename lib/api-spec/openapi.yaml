@@ -1,23 +1,22 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: BFF contract for the EduTutor educational tutoring platform
+  description: BFF contract for the EduTutor educational tutoring platform (ms-edututor-bff)
 servers:
   - url: /api
-    description: Base API path
+    description: Base API path for ms-edututor-bff
 tags:
   - name: health
     description: Health operations
   - name: catalog
-    description: Tutoring service catalog
+    description: Educational service catalog (ms-edututor-catalog)
   - name: sessions
-    description: Tutoring session lifecycle
-  - name: analytics
-    description: Session and revenue analytics
+    description: Tutoring session lifecycle and state machine (ms-edututor-sessions)
+  - name: report
+    description: Aggregated KPIs and metrics (ms-edututor-report)
   - name: audit
-    description: Audit trail events
+    description: Audit trail events from Kafka (ms-edututor-audit)
 paths:
   /healthz:
     get:
@@ -32,7 +31,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
-  /v1/services:
+
+  # ==========================================================================
+  # 1. CATALOG CONTROLLER (/api/v1/catalog/...)
+  # ==========================================================================
+  /v1/catalog/services:
     get:
       operationId: listServices
       tags: [catalog]
@@ -62,6 +65,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Servicio"
+
+  # ==========================================================================
+  # 2. SESSIONS CONTROLLER (/api/v1/sessions/...)
+  # ==========================================================================
   /v1/sessions:
     get:
       operationId: listSessions
@@ -104,11 +111,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sesion"
+
   /v1/sessions/{id}/status:
     patch:
       operationId: transitionSession
       tags: [sessions]
-      summary: Transition a session status
+      summary: Transition a session status in state machine
       parameters:
         - name: id
           in: path
@@ -128,16 +136,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sesion"
-        "409":
-          description: Illegal state transition
+        "400":
+          description: Bad request or validation failure
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /v1/analytics/summary:
+        "409":
+          description: IllegalStateTransitionException - invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ==========================================================================
+  # 3. REPORT CONTROLLER (/api/v1/report/...)
+  # ==========================================================================
+  /v1/report/summary:
     get:
       operationId: getAnalyticsSummary
-      tags: [analytics]
+      tags: [report]
       summary: Get dashboard KPI summary
       responses:
         "200":
@@ -146,10 +164,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AnalyticsSummary"
-  /v1/analytics/hourly:
+
+  /v1/report/hourly:
     get:
       operationId: getHourlyMetrics
-      tags: [analytics]
+      tags: [report]
       summary: Get demand by hour
       responses:
         "200":
@@ -160,10 +179,11 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/MetricaHora"
-  /v1/analytics/daily:
+
+  /v1/report/daily:
     get:
       operationId: getDailyMetrics
-      tags: [analytics]
+      tags: [report]
       summary: Get daily service metrics
       responses:
         "200":
@@ -174,11 +194,30 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/MetricaServicioDia"
-  /v1/audit-events:
+
+  /v1/report/kpis:
+    get:
+      operationId: getReportKpis
+      tags: [report]
+      summary: Get program gauges and state distribution
+      responses:
+        "200":
+          description: State distribution gauges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EstadoGauge"
+
+  # ==========================================================================
+  # 4. AUDIT CONTROLLER (/api/v1/audit/...)
+  # ==========================================================================
+  /v1/audit/events:
     get:
       operationId: listAuditEvents
       tags: [audit]
-      summary: List audit events
+      summary: List audit trail events
       parameters:
         - name: eventType
           in: query
@@ -201,6 +240,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/EventoAuditoria"
+
 components:
   schemas:
     HealthStatus:
@@ -213,6 +253,16 @@ components:
     EstadoSesion:
       type: string
       enum: [AGENDADA, CONFIRMADA, EN_CURSO, FINALIZADA, CANCELADA]
+    EstadoGauge:
+      type: object
+      required: [estado, porcentaje, total]
+      properties:
+        estado:
+          $ref: "#/components/schemas/EstadoSesion"
+        porcentaje:
+          type: number
+        total:
+          type: integer
     Servicio:
       type: object
       required: [id, nombre, descripcion, categoria, tutorNombre, precioHora, duracionMinutos, estado]
@@ -295,4 +345,6 @@ components:
       required: [error]
       properties:
         error: { type: string }
-
+        message: { type: string }
+        status: { type: integer }
+        path: { type: string }

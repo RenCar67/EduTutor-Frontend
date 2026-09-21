@@ -20,6 +20,7 @@ import {
 } from '@workspace/api-client-react';
 import type { EstadoSesion, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useWorkspace, lifecycle } from '@/components/app-shell';
+import { useToast } from '@/hooks/use-toast';
 import { ActionButton, ArrowLink, EmptyState, ErrorState, MetricCard, SectionHeading, SelectField, SkeletonRows, StatusPill } from '@/components/ui';
 
 const statusLabels: Record<string, string> = { AGENDADA: 'Agendadas', CONFIRMADA: 'Confirmadas', EN_CURSO: 'En curso', FINALIZADA: 'Finalizadas', CANCELADA: 'Canceladas' };
@@ -81,6 +82,7 @@ function ModuleCard({ href, icon, number, title, detail }: { href: string; icon:
 
 export function CatalogPage() {
   const { mockMode, services: localServices, createLocalSession } = useWorkspace();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateSession();
   const [search, setSearch] = useState('');
@@ -96,12 +98,32 @@ export function CatalogPage() {
     if (mockMode) {
       createLocalSession(input);
       setSelected(null);
+      toast({
+        title: 'Sesión agendada localmente',
+        description: 'La sesión se reservó en el workspace de demostración.',
+      });
       return;
     }
     createMutation.mutate({ data: input }, {
       onSuccess: () => {
         setSelected(null);
+        toast({
+          title: 'Sesión confirmada en BFF',
+          description: 'La sesión fue transmitida al microservicio de sesiones en AWS.',
+        });
         void queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+      },
+      onError: (error: any) => {
+        const errorDetail =
+          error?.data?.error ||
+          error?.data?.message ||
+          error?.message ||
+          'No se pudo registrar la sesión en el catálogo del BFF.';
+        toast({
+          title: 'Error al agendar sesión',
+          description: errorDetail,
+          variant: 'destructive',
+        });
       },
     });
   };
@@ -128,6 +150,7 @@ function ScheduleDialog({ service, onClose, onCreate, pending }: { service: impo
 
 export function SessionsPage() {
   const { mockMode, sessions: localSessions, services, createLocalSession, transitionLocalSession } = useWorkspace();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const sessionsQuery = useListSessions(undefined, { query: { enabled: !mockMode, queryKey: getListSessionsQueryKey() } });
   const transitionMutation = useTransitionSession();
@@ -138,12 +161,85 @@ export function SessionsPage() {
   const allSessions = mockMode ? localSessions : sessionsQuery.data ?? [];
   const filtered = allSessions.filter((session) => (!status || session.estado === status) && (!search || `${session.id} ${session.servicioNombre} ${session.tutorNombre}`.toLowerCase().includes(search.toLowerCase())));
   const transition = (session: Sesion, next: EstadoSesion) => {
-    if (mockMode) transitionLocalSession(session.id, next);
-    else transitionMutation.mutate({ id: session.id, data: { estado: next } }, { onSuccess: () => { void queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() }); } });
+    if (mockMode) {
+      try {
+        transitionLocalSession(session.id, next);
+        toast({
+          title: 'Estado actualizado',
+          description: `La sesión ${session.id} ahora está en estado ${statusLabels[next]}.`,
+        });
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : 'Error desconocido al mover estado.';
+        toast({
+          title: 'Regla de negocio infringida (409 Conflict)',
+          description: errorMsg,
+          variant: 'destructive',
+        });
+      }
+    } else {
+      transitionMutation.mutate(
+        { id: session.id, data: { estado: next } },
+        {
+          onSuccess: () => {
+            toast({
+              title: 'Estado sincronizado con BFF',
+              description: `La sesión ${session.id} cambió a ${statusLabels[next]} en Oracle XE.`,
+            });
+            void queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+          },
+          onError: (error: any) => {
+            const serverMessage =
+              error?.data?.error ||
+              error?.data?.message ||
+              error?.message ||
+              'Transición de estado rechazada por la máquina de estados de Spring Boot.';
+            toast({
+              title: error?.status === 409 || error?.status === 400
+                ? 'Regla de negocio infringida (Spring Boot 409)'
+                : 'Error en la transición de sesión',
+              description: serverMessage,
+              variant: 'destructive',
+            });
+          },
+        },
+      );
+    }
   };
   const create = (input: SesionInput) => {
-    if (mockMode) { createLocalSession(input); setShowCreate(false); return; }
-    createMutation.mutate({ data: input }, { onSuccess: () => { setShowCreate(false); void queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() }); } });
+    if (mockMode) {
+      createLocalSession(input);
+      setShowCreate(false);
+      toast({
+        title: 'Sesión creada localmente',
+        description: 'La sesión se agregó al workspace de demostración.',
+      });
+      return;
+    }
+    createMutation.mutate(
+      { data: input },
+      {
+        onSuccess: () => {
+          setShowCreate(false);
+          toast({
+            title: 'Sesión creada en BFF',
+            description: 'La sesión fue persistida y emitida a RabbitMQ / Kafka.',
+          });
+          void queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+        },
+        onError: (error: any) => {
+          const serverMessage =
+            error?.data?.error ||
+            error?.data?.message ||
+            error?.message ||
+            'Error al crear la sesión en el BFF.';
+          toast({
+            title: 'Error al crear sesión',
+            description: serverMessage,
+            variant: 'destructive',
+          });
+        },
+      },
+    );
   };
   return <div className="space-y-7">
     <PageIntro eyebrow="Operación · Sesiones" title="Cada encuentro, en contexto." detail="Sigue el ciclo completo de tus sesiones. Los cambios de estado quedan visibles para todo el equipo." action={<ActionButton onClick={() => setShowCreate(true)} testId="button-new-session"><Plus size={15} /> Nueva sesión</ActionButton>} />

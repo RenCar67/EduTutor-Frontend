@@ -30,13 +30,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState(demoSessions);
   const [audit] = useState(demoAudit);
   useEffect(() => {
-    const userByRole: Record<Role, { id: string; apiRole: string }> = {
-      Estudiante: { id: 'student-001', apiRole: 'estudiante' },
-      Tutor: { id: 'tutor-003', apiRole: 'tutor' },
-      Administrador: { id: 'admin-001', apiRole: 'admin' },
+    const userByRole: Record<Role, { id: string; apiRole: string; token: string }> = {
+      Estudiante: { id: 'student-001', apiRole: 'ESTUDIANTE', token: 'simulated-azure-ad-jwt-estudiante' },
+      Tutor: { id: 'tutor-003', apiRole: 'TUTOR', token: 'simulated-azure-ad-jwt-tutor' },
+      Administrador: { id: 'admin-001', apiRole: 'ADMIN', token: 'simulated-azure-ad-jwt-admin' },
     };
     const currentUser = userByRole[role];
-    setRequestContext({ userId: currentUser.id, userRole: currentUser.apiRole });
+    setRequestContext({
+      userId: currentUser.id,
+      userRole: currentUser.apiRole,
+      authToken: currentUser.token,
+    });
   }, [role]);
   const createLocalSession = (input: SesionInput) => {
     const service = services.find((item) => item.id === input.servicioId) ?? services[0];
@@ -53,6 +57,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }, ...current]);
   };
   const transitionLocalSession = (id: string, status: Sesion['estado']) => {
+    const targetSession = sessions.find((s) => s.id === id);
+    if (!targetSession) {
+      throw new Error(`No se encontró la sesión ${id}`);
+    }
+    // Regla de invariante Caso 5: No se puede transicionar a EN_CURSO sin tutor asignado previamente
+    if (status === 'EN_CURSO' && (!targetSession.tutorId || targetSession.estado === 'AGENDADA')) {
+      throw new Error(
+        'IllegalStateTransitionException: No se puede iniciar una sesión (EN_CURSO) sin tutor previamente asignado y confirmado.'
+      );
+    }
+    // Validar transiciones permitidas
+    const allowed = lifecycle[targetSession.estado] ?? [];
+    if (!allowed.includes(status)) {
+      throw new Error(
+        `IllegalStateTransitionException: Transición inválida de ${targetSession.estado} a ${status}.`
+      );
+    }
     setSessions((current) => current.map((session) => session.id === id ? { ...session, estado: status } : session));
   };
   const value = useMemo(() => ({
@@ -108,7 +129,20 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="md:pl-[252px]">
         <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-border/70 bg-background/90 px-5 backdrop-blur-md md:px-9">
           <div className="flex items-center gap-3"><button className="rounded-xl p-2 hover:bg-muted md:hidden" onClick={() => setMobileOpen(true)} data-testid="button-open-menu"><Menu size={20} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">Workspace / <span className="text-primary">{current?.label ?? 'Resumen'}</span></p><h1 className="mt-1 font-display text-[21px] font-bold tracking-tight">{current?.label ?? 'Resumen operativo'}</h1></div></div>
-          <div className="flex items-center gap-2.5"><button className="hidden rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary sm:block" data-testid="button-search"><Search size={17} /></button><button className="relative rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary" data-testid="button-notifications"><Bell size={17} /><span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" /></button><div className="ml-1 hidden h-8 w-px bg-border sm:block" /><label className="relative"><span className="sr-only">Seleccionar rol</span><select value={role} onChange={(event) => setRole(event.target.value as typeof role)} className="appearance-none rounded-xl border border-border bg-card py-2 pl-3 pr-8 text-[11px] font-semibold text-foreground outline-none transition focus:border-primary" data-testid="select-role">{(['Estudiante', 'Tutor', 'Administrador'] as Role[]).map((item) => <option key={item}>{item}</option>)}</select><ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-2.5 text-muted-foreground" /></label></div>
+          <div className="flex items-center gap-2.5">
+            <span className="hidden items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/5 px-2.5 py-1.5 font-mono-ui text-[10px] font-semibold text-primary lg:inline-flex" title="Cabecera X-User-Role propagada al BFF">
+              <ShieldCheck size={13} />
+              BFF: {role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Tutor' ? 'TUTOR' : 'ADMIN'}
+            </span>
+            <button className="hidden rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary sm:block" data-testid="button-search"><Search size={17} /></button>
+            <button className="relative rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary" data-testid="button-notifications"><Bell size={17} /><span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" /></button>
+            <div className="ml-1 hidden h-8 w-px bg-border sm:block" />
+            <label className="relative">
+              <span className="sr-only">Seleccionar rol</span>
+              <select value={role} onChange={(event) => setRole(event.target.value as typeof role)} className="appearance-none rounded-xl border border-border bg-card py-2 pl-3 pr-8 text-[11px] font-semibold text-foreground outline-none transition focus:border-primary" data-testid="select-role">{(['Estudiante', 'Tutor', 'Administrador'] as Role[]).map((item) => <option key={item}>{item}</option>)}</select>
+              <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-2.5 text-muted-foreground" />
+            </label>
+          </div>
         </header>
         <main className="page-enter mx-auto max-w-[1500px] px-5 py-7 md:px-9 md:py-9">{children}</main>
       </div>

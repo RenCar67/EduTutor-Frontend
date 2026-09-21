@@ -1,3 +1,17 @@
+/**
+ * ============================================================================
+ * MOCK SERVER AUXILIAR — DESARROLLO LOCAL Y SANDBOX OFFLINE (CASO 5)
+ * ============================================================================
+ * AVISO ARQUITECTÓNICO:
+ * Este servicio Express en memoria es EXCLUSIVAMENTE una herramienta auxiliar
+ * de sandbox para desarrollo frontend sin conexión a la infraestructura en AWS.
+ *
+ * En entornos de pruebas integradas y producción, el backend oficial está
+ * desarrollado en Java / Spring Boot sobre AWS EC2 (ec2-apps), con base de
+ * datos Oracle Database XE, RabbitMQ (ec2-mq) y Apache Kafka (ec2-kafka).
+ * ============================================================================
+ */
+
 import { Router, type IRouter } from "express";
 import {
   CreateSessionBody,
@@ -284,7 +298,22 @@ function createAuditEvent(eventoTipo: string, payloadJson: Record<string, unknow
 
 const router: IRouter = Router();
 
-router.get("/v1/services", (req, res) => {
+// Log context headers injected by frontend
+router.use((req, _res, next) => {
+  const userId = req.headers["x-user-id"] || "ANONYMOUS";
+  const userRole = req.headers["x-user-role"] || "NONE";
+  const auth = req.headers["authorization"] ? "Bearer ***" : "NONE";
+  // Development log to confirm RequireBffContextFilter compliance
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[BFF-Mock] ${req.method} ${req.originalUrl} | X-User-Id: ${userId} | X-User-Role: ${userRole} | Auth: ${auth}`);
+  }
+  next();
+});
+
+// ============================================================================
+// 1. CATALOG CONTROLLER (/api/v1/catalog/... and /api/v1/services)
+// ============================================================================
+const handleListServices = (req: any, res: any) => {
   const parsed = ListServicesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Parámetros de catálogo inválidos." });
@@ -306,8 +335,14 @@ router.get("/v1/services", (req, res) => {
   });
 
   res.json(ListServicesResponse.parse(filtered));
-});
+};
 
+router.get("/v1/catalog/services", handleListServices);
+router.get("/v1/services", handleListServices);
+
+// ============================================================================
+// 2. SESSIONS CONTROLLER (/api/v1/sessions/...)
+// ============================================================================
 router.get("/v1/sessions", (req, res) => {
   const parsed = ListSessionsQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -360,19 +395,43 @@ router.patch("/v1/sessions/:id/status", (req, res) => {
   const params = TransitionSessionParams.safeParse(req.params);
   const body = TransitionSessionBody.safeParse(req.body);
   if (!params.success || !body.success) {
-    res.status(400).json({ error: "La transición solicitada es inválida." });
+    res.status(400).json({
+      status: 400,
+      error: "Bad Request",
+      message: "La transición solicitada es inválida.",
+      path: req.originalUrl,
+    });
     return;
   }
 
   const session = sessions.find((item) => item.id === params.data.id);
   if (!session) {
-    res.status(404).json({ error: "No se encontró la sesión." });
+    res.status(404).json({
+      status: 404,
+      error: "Not Found",
+      message: "No se encontró la sesión solicitada.",
+      path: req.originalUrl,
+    });
+    return;
+  }
+
+  // Regla invariante Caso 5: No se puede transicionar a EN_CURSO sin tutor asignado previo
+  if (body.data.estado === "EN_CURSO" && (!session.tutorId || session.estado === "AGENDADA")) {
+    res.status(409).json({
+      status: 409,
+      error: "Conflict",
+      message: "IllegalStateTransitionException: No se puede iniciar una sesión sin tutor previamente asignado y confirmado.",
+      path: req.originalUrl,
+    });
     return;
   }
 
   if (!allowedTransitions[session.estado].includes(body.data.estado)) {
     res.status(409).json({
-      error: `IllegalStateTransitionException: no se puede pasar de ${session.estado} a ${body.data.estado}.`,
+      status: 409,
+      error: "Conflict",
+      message: `IllegalStateTransitionException: No se puede pasar del estado ${session.estado} al estado ${body.data.estado}.`,
+      path: req.originalUrl,
     });
     return;
   }
@@ -387,7 +446,10 @@ router.patch("/v1/sessions/:id/status", (req, res) => {
   res.json(ListSessionsResponse.element.parse(session));
 });
 
-router.get("/v1/analytics/summary", (_req, res) => {
+// ============================================================================
+// 3. REPORT CONTROLLER (/api/v1/report/... and /api/v1/analytics/...)
+// ============================================================================
+const handleSummary = (_req: any, res: any) => {
   res.json(
     GetAnalyticsSummaryResponse.parse({
       activeSessions: sessions.filter((s) =>
@@ -401,17 +463,38 @@ router.get("/v1/analytics/summary", (_req, res) => {
       revenueChange: 8.4,
     }),
   );
-});
+};
 
-router.get("/v1/analytics/hourly", (_req, res) => {
+const handleHourly = (_req: any, res: any) => {
   res.json(GetHourlyMetricsResponse.parse(hourlyMetrics));
-});
+};
 
-router.get("/v1/analytics/daily", (_req, res) => {
+const handleDaily = (_req: any, res: any) => {
   res.json(GetDailyMetricsResponse.parse(dailyMetrics));
+};
+
+router.get("/v1/report/summary", handleSummary);
+router.get("/v1/analytics/summary", handleSummary);
+
+router.get("/v1/report/hourly", handleHourly);
+router.get("/v1/analytics/hourly", handleHourly);
+
+router.get("/v1/report/daily", handleDaily);
+router.get("/v1/analytics/daily", handleDaily);
+
+router.get("/v1/report/kpis", (_req, res) => {
+  res.json([
+    { estado: "FINALIZADA", porcentaje: 66, total: 114 },
+    { estado: "EN_CURSO", porcentaje: 13, total: 22 },
+    { estado: "AGENDADA", porcentaje: 13, total: 23 },
+    { estado: "CANCELADA", porcentaje: 8, total: 14 },
+  ]);
 });
 
-router.get("/v1/audit-events", (req, res) => {
+// ============================================================================
+// 4. AUDIT CONTROLLER (/api/v1/audit/... and /api/v1/audit-events)
+// ============================================================================
+const handleAuditEvents = (req: any, res: any) => {
   const parsed = ListAuditEventsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Parámetros de auditoría inválidos." });
@@ -423,6 +506,10 @@ router.get("/v1/audit-events", (req, res) => {
     .filter((event) => !eventType || event.eventoTipo === eventType)
     .slice(0, limit ?? 50);
   res.json(ListAuditEventsResponse.parse(filtered));
-});
+};
+
+router.get("/v1/audit/events", handleAuditEvents);
+router.get("/v1/audit/timeline", handleAuditEvents);
+router.get("/v1/audit-events", handleAuditEvents);
 
 export default router;

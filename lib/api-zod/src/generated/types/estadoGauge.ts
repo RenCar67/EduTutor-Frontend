@@ -5,11 +5,10 @@
  * BFF contract for the EduTutor educational tutoring platform (ms-edututor-bff)
  * OpenAPI spec version: 0.1.0
  */
+import type { EstadoSesion } from './estadoSesion';
 
-export interface MetricaServicioDia {
-  fecha: Date;
-  servicioId: string;
-  servicioNombre: string;
-  ingresos: number;
-  sesionesTotales: number;
+export interface EstadoGauge {
+  estado: EstadoSesion;
+  porcentaje: number;
+  total: number;
 }

@@ -1,0 +1,1 @@
+El backend oficial es Spring Boot (Java) con Oracle XE. api-server es exclusivamente un mock de desarrollo. El frontend solo consume el BFF con cabeceras X-User-Id y X-User-Role.

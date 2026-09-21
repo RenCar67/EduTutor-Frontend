@@ -11,6 +11,7 @@ export type AuthTokenGetter = () => Promise<string | null> | string | null;
 export type RequestContext = {
   userId: string;
   userRole: string;
+  authToken?: string | null;
 };
 
 const NO_BODY_STATUS = new Set([204, 205, 304]);
@@ -347,9 +348,31 @@ export async function customFetch<T = unknown>(
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
 
-  if (_requestContext) {
-    headers.set("X-User-Id", _requestContext.userId);
-    headers.set("X-User-Role", _requestContext.userRole);
+  // Inject context required by Spring Boot BFF RequireBffContextFilter
+  const userId = _requestContext?.userId || "student-001";
+  const userRole = (_requestContext?.userRole || "ESTUDIANTE").toUpperCase();
+
+  if (!headers.has("X-User-Id")) {
+    headers.set("X-User-Id", userId);
+  }
+  if (!headers.has("X-User-Role")) {
+    headers.set("X-User-Role", userRole);
+  }
+
+  // Attach bearer token (Azure AD / Entra ID token)
+  if (!headers.has("authorization")) {
+    if (_requestContext?.authToken) {
+      const token = _requestContext.authToken;
+      headers.set("authorization", token.startsWith("Bearer ") ? token : `Bearer ${token}`);
+    } else if (_authTokenGetter) {
+      const token = await _authTokenGetter();
+      if (token) {
+        headers.set("authorization", token.startsWith("Bearer ") ? token : `Bearer ${token}`);
+      }
+    } else {
+      // Default simulated Entra ID bearer token
+      headers.set("authorization", `Bearer simulated-azure-ad-jwt-${userRole.toLowerCase()}`);
+    }
   }
 
   if (
@@ -362,15 +385,6 @@ export async function customFetch<T = unknown>(
 
   if (responseType === "json" && !headers.has("accept")) {
     headers.set("accept", DEFAULT_JSON_ACCEPT);
-  }
-
-  // Attach bearer token when an auth getter is configured and no
-  // Authorization header has been explicitly provided.
-  if (_authTokenGetter && !headers.has("authorization")) {
-    const token = await _authTokenGetter();
-    if (token) {
-      headers.set("authorization", `Bearer ${token}`);
-    }
   }
 
   const requestInfo = { method, url: resolveUrl(input) };
