@@ -5,7 +5,8 @@ import { useAuth, type AppRole, type AuthMode } from '@/auth/auth-context';
 
 const roles: Array<{ value: AppRole; label: string; detail: string }> = [
   { value: 'ESTUDIANTE', label: 'Estudiante', detail: 'Explorar tutorías y gestionar tus sesiones' },
-  { value: 'TUTOR', label: 'Tutor', detail: 'Ver agenda y actualizar sesiones asignadas' },
+  { value: 'COORDINADOR', label: 'Coordinador', detail: 'Ver agenda y coordinar sesiones' },
+  { value: 'AUDITOR', label: 'Auditor', detail: 'Consultar eventos y métricas de auditoría' },
   { value: 'ADMIN', label: 'Administrador', detail: 'Acceso completo a operación y auditoría' },
 ];
 

@@ -5,7 +5,7 @@ import { demoAudit, demoDaily, demoHourly, demoServices, demoSessions, demoSumma
 import type { AnalyticsSummary, EventoAuditoria, MetricaHora, MetricaServicioDia, Servicio, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useAuth, type AppRole } from '@/auth/auth-context';
 
-type Role = 'Estudiante' | 'Tutor' | 'Administrador';
+type Role = 'Estudiante' | 'Coordinador' | 'Administrador' | 'Auditor';
 type WorkspaceContextValue = {
   mockMode: boolean;
   setMockMode: (value: boolean) => void;
@@ -35,10 +35,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const roleLabels: Record<AppRole, Role> = {
       ESTUDIANTE: 'Estudiante',
-      TUTOR: 'Tutor',
+      COORDINADOR: 'Coordinador',
       ADMIN: 'Administrador',
+      AUDITOR: 'Auditor',
     };
-    if (user) {
+    if (user && roleLabels[user.role]) {
       setRole(roleLabels[user.role]);
     }
   }, [user]);
@@ -110,8 +111,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const roleByLabel: Record<Role, AppRole> = {
     Estudiante: 'ESTUDIANTE',
-    Tutor: 'TUTOR',
+    Coordinador: 'COORDINADOR',
     Administrador: 'ADMIN',
+    Auditor: 'AUDITOR',
   };
 
   const initials = (user?.name ?? 'EduTutor')
@@ -181,7 +183,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
             </button>
             <p className="mt-2 text-[10px] leading-relaxed text-sidebar-foreground/40">
-              {mockMode ? 'Demo workspace · local data' : 'Live API · synced workspace'}
+              {mockMode ? 'Demo workspace · local data' : 'Live API · sesión Azure AD'}
             </p>
           </div>
 
@@ -243,7 +245,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               title="Cabecera X-User-Role propagada al BFF"
             >
               <ShieldCheck size={13} />
-              BFF: {user?.role ?? (role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Tutor' ? 'TUTOR' : 'ADMIN')}
+              BFF: {user?.role ?? (role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Coordinador' ? 'COORDINADOR' : role === 'Auditor' ? 'AUDITOR' : 'ADMIN')}
             </span>
             <button
               className="hidden rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary sm:block"
@@ -272,7 +274,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="appearance-none rounded-xl border border-border bg-card py-2 pl-3 pr-8 text-[11px] font-semibold text-foreground outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
                 data-testid="select-role"
               >
-                {(['Estudiante', 'Tutor', 'Administrador'] as Role[]).map((item) => (
+                {(['Estudiante', 'Coordinador', 'Administrador', 'Auditor'] as Role[]).map((item) => (
                   <option key={item}>{item}</option>
                 ))}
               </select>

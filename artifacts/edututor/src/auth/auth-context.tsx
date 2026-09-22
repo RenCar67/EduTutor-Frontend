@@ -1,11 +1,11 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { InteractionStatus, type AccountInfo, type IdTokenClaims } from '@azure/msal-browser';
 import { useMsal } from '@azure/msal-react';
-import { azureConfigured, loginRequest, tokenRequest } from './authConfig';
+import { azureConfigured, loginRequest, tokenRequest, CANONICAL_ROLES, type CanonicalRole } from './authConfig';
 import { configureBffInterceptor } from './httpClient';
 import { setAuthTokenGetter, setRequestContext } from '@workspace/api-client-react';
 
-export type AppRole = 'ESTUDIANTE' | 'TUTOR' | 'ADMIN';
+export type AppRole = CanonicalRole;
 export type AuthMode = 'azure' | 'mock';
 
 export type AppUser = {
@@ -33,7 +33,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const AUTH_MODE_KEY = 'edututor.auth.mode';
 const MOCK_USER_KEY = 'edututor.auth.mock-user';
 
-const mockUsers: Record<AppRole, AppUser> = {
+export const mockUsers: Record<AppRole, AppUser> = {
   ESTUDIANTE: {
     userId: 'student-001',
     name: 'Sofía Estudiante',
@@ -41,11 +41,11 @@ const mockUsers: Record<AppRole, AppUser> = {
     role: 'ESTUDIANTE',
     source: 'mock',
   },
-  TUTOR: {
-    userId: 'tutor-003',
-    name: 'Camila Pérez',
-    username: 'tutor@edututor.demo',
-    role: 'TUTOR',
+  COORDINADOR: {
+    userId: 'coordinador-002',
+    name: 'Carlos Coordinador',
+    username: 'coordinador@edututor.demo',
+    role: 'COORDINADOR',
     source: 'mock',
   },
   ADMIN: {
@@ -53,6 +53,13 @@ const mockUsers: Record<AppRole, AppUser> = {
     name: 'Mariana García',
     username: 'admin@edututor.demo',
     role: 'ADMIN',
+    source: 'mock',
+  },
+  AUDITOR: {
+    userId: 'auditor-004',
+    name: 'Andrea Auditora',
+    username: 'auditor@edututor.demo',
+    role: 'AUDITOR',
     source: 'mock',
   },
 };
@@ -77,7 +84,8 @@ function normalizeRole(value: unknown): AppRole | null {
   if (typeof value !== 'string') return null;
   const role = value.trim().toUpperCase();
   if (role.includes('ADMIN')) return 'ADMIN';
-  if (role.includes('TUTOR') || role.includes('TEACHER')) return 'TUTOR';
+  if (role.includes('COORD') || role.includes('TUTOR') || role.includes('TEACHER')) return 'COORDINADOR';
+  if (role.includes('AUDIT')) return 'AUDITOR';
   if (role.includes('ESTUDIANTE') || role.includes('STUDENT')) return 'ESTUDIANTE';
   return null;
 }
@@ -187,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithAzure = async () => {
     setError(null);
     if (!azureConfigured) {
-      setError('Azure AD no está configurado. Define VITE_AZURE_CLIENT_ID y VITE_AZURE_TENANT_ID para activar este modo.');
+      setError('Azure AD no está configurado.');
       return;
     }
     setMode('azure');
