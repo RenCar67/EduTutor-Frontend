@@ -74,12 +74,20 @@ Para configurar el cliente web oficial hacia el entorno correspondiente:
 ```bash
 # artifacts/edututor/.env.local (o variables de entorno del sistema)
 
-# Producción / AWS (conecta directamente al BFF Spring Boot):
-VITE_API_BASE_URL=http://ec2-apps:8080
+# 1. Conexión al BFF Spring Boot:
+# Producción / AWS (conecta directamente al BFF Spring Boot o API Gateway):
+VITE_API_BASE_URL=http://ec2-apps:8080/api
 
-# Desarrollo local con Mock Server (por defecto relativo / proxy en 5000):
-# VITE_API_BASE_URL=http://localhost:5000
+# 2. Autenticación Institucional con Azure AD / Microsoft Entra ID (OIDC + PKCE):
+VITE_AZURE_CLIENT_ID=00000000-0000-0000-0000-000000000000
+VITE_AZURE_TENANT_ID=00000000-0000-0000-0000-000000000000
+VITE_AZURE_REDIRECT_URI=http://localhost:5173
+VITE_AZURE_BFF_SCOPE=api://00000000-0000-0000-0000-000000000000/access_as_user
 ```
+
+### Modos de Autenticación Soportados
+1. **Azure AD / Microsoft Entra ID**: Inicia sesión vía OAuth 2.0 / OpenID Connect con PKCE. Extrae claims (`oid`/`sub` como `userId`, `roles` de aplicación de Azure como `ESTUDIANTE`, `TUTOR`, `ADMIN`) y adquiere tokens de acceso para la cabecera `Authorization: Bearer <token>`.
+2. **Modo de Evaluación (Mock)**: En la pantalla de login (`/login`) permite ingresar instantáneamente como **Estudiante**, **Tutor** o **Administrador** con un solo clic, sin requerir credenciales activas de Microsoft en el Tenant.
 
 ---
 
