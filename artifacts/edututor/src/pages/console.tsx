@@ -32,42 +32,120 @@ function PageIntro({ eyebrow, title, detail, action }: { eyebrow: string; title:
 }
 
 export function DashboardPage() {
-  const { mockMode, summary: localSummary, hourly: localHourly, sessions: localSessions } = useWorkspace();
+  const { mockMode, role, summary: localSummary, hourly: localHourly, sessions: localSessions } = useWorkspace();
   const summaryQuery = useGetAnalyticsSummary({ query: { enabled: !mockMode, queryKey: getGetAnalyticsSummaryQueryKey() } });
   const hourlyQuery = useGetHourlyMetrics({ query: { enabled: !mockMode, queryKey: getGetHourlyMetricsQueryKey() } });
   const sessionsQuery = useListSessions(undefined, { query: { enabled: !mockMode, queryKey: getListSessionsQueryKey() } });
   const summary = mockMode ? localSummary : summaryQuery.data;
   const hourly = mockMode ? localHourly : hourlyQuery.data ?? [];
   const sessions = mockMode ? localSessions : sessionsQuery.data ?? [];
-  const active = sessions.filter((session) => ['AGENDADA', 'CONFIRMADA', 'EN_CURSO'].includes(session.estado)).slice(0, 5);
-  if (!mockMode && (summaryQuery.isLoading || hourlyQuery.isLoading || sessionsQuery.isLoading)) return <><PageIntro eyebrow="Buenos días, Mariana" title="El pulso de tus operaciones." detail="Una vista tranquila para saber qué necesita atención y qué está avanzando bien." /><SkeletonRows count={5} /></>;
-  if (!mockMode && (summaryQuery.isError || hourlyQuery.isError || sessionsQuery.isError)) return <ErrorState onRetry={() => { void summaryQuery.refetch(); void hourlyQuery.refetch(); void sessionsQuery.refetch(); }} />;
+
+  const isStudent = role === 'Estudiante';
+  const isCoordinator = role === 'Coordinador';
+  const isAuditor = role === 'Auditor';
+
+  const introEyebrow = isStudent
+    ? 'Portal del Estudiante · Mis Tutorías'
+    : isCoordinator
+    ? 'Coordinación Operativa · Tutorías'
+    : isAuditor
+    ? 'Acreditación y Control · Auditoría'
+    : 'Administración del Programa · Vista General';
+
+  const introTitle = isStudent
+    ? 'Tus próximas sesiones académicas.'
+    : isCoordinator
+    ? 'Sesiones por confirmar y en curso.'
+    : isAuditor
+    ? 'Trazabilidad y pulso del programa.'
+    : 'El pulso de tus operaciones.';
+
+  const introDetail = isStudent
+    ? 'Revisa tus tutorías agendadas, conéctate a tiempo o solicita un nuevo acompañamiento académico.'
+    : isCoordinator
+    ? 'Confirma las solicitudes entrantes, asigna tutores y supervisa las salas en desarrollo.'
+    : isAuditor
+    ? 'Supervisión en tiempo real de eventos académicos y cumplimiento del programa de tutorías.'
+    : 'Una vista tranquila para saber qué necesita atención y qué está avanzando bien.';
+
+  const active = sessions
+    .filter((session) => {
+      if (isStudent) return ['AGENDADA', 'CONFIRMADA', 'EN_CURSO'].includes(session.estado);
+      if (isCoordinator) return ['AGENDADA', 'CONFIRMADA', 'EN_CURSO'].includes(session.estado);
+      return ['AGENDADA', 'CONFIRMADA', 'EN_CURSO'].includes(session.estado);
+    })
+    .slice(0, 5);
+
+  if (!mockMode && (summaryQuery.isLoading || hourlyQuery.isLoading || sessionsQuery.isLoading)) {
+    return (
+      <>
+        <PageIntro eyebrow={introEyebrow} title={introTitle} detail={introDetail} />
+        <SkeletonRows count={5} />
+      </>
+    );
+  }
+  if (!mockMode && (summaryQuery.isError || hourlyQuery.isError || sessionsQuery.isError)) {
+    return <ErrorState onRetry={() => { void summaryQuery.refetch(); void hourlyQuery.refetch(); void sessionsQuery.refetch(); }} />;
+  }
   if (!summary) return null;
   const maxHour = Math.max(...hourly.map((item) => item.totalSesiones), 1);
-  return <div className="space-y-8">
-    <PageIntro eyebrow="Buenos días, Mariana · Miércoles 21 de mayo" title="El pulso de tus operaciones." detail="Una vista tranquila para saber qué necesita atención y qué está avanzando bien." action={<Link href="/sessions" className="group inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground shadow-[0_6px_18px_hsl(var(--primary)/.2)] transition hover:-translate-y-0.5" data-testid="link-dashboard-new-session"><Plus size={15} /> Nueva sesión</Link>} />
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <MetricCard label="Sesiones activas" value={String(summary.activeSessions)} trend={`+${summary.sessionsChange}%`} detail="vs. semana anterior" tone="teal" />
-      <MetricCard label="Completadas" value={String(summary.completedSessions)} detail="últimos 30 días" tone="gold" />
-      <MetricCard label="Tasa de éxito" value={`${summary.successRate}%`} trend="+2.1 pp" detail="objetivo: 92%" tone="navy" />
-      <MetricCard label="Ingresos semanales" value={money(summary.weeklyRevenue)} trend={`+${summary.revenueChange}%`} detail="vs. semana anterior" tone="teal" />
-      <MetricCard label="Cancelaciones" value={String(summary.cancelledSessions)} trend="-3.4%" detail="últimos 30 días" tone="red" />
-    </div>
-    <div className="grid gap-5 xl:grid-cols-[1.6fr_.9fr]">
-      <section className="rounded-2xl border border-card-border bg-card p-5 shadow-[0_8px_26px_hsl(var(--foreground)/.025)] md:p-6">
-        <SectionHeading eyebrow="Ritmo de demanda" title="Sesiones por hora" detail="Concentración de demanda durante el día" action={<button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" data-testid="button-demand-options"><MoreHorizontal size={17} /></button>} />
-        <div className="flex h-[220px] items-end gap-2 border-b border-border/70 pb-0 pt-5 sm:gap-3">{hourly.map((item, index) => <div key={item.hora} className="group flex h-full flex-1 flex-col justify-end gap-2"><div className="relative flex-1"><div className="absolute bottom-0 left-1/2 w-full -translate-x-1/2 rounded-t-lg bg-[hsl(var(--primary)/.13)] transition-all duration-300 group-hover:bg-[hsl(var(--primary)/.27)]" style={{ height: `${Math.max(9, item.totalSesiones / maxHour * 100)}%` }}><span className="absolute -top-6 left-1/2 -translate-x-1/2 font-mono-ui text-[9px] text-primary opacity-0 transition group-hover:opacity-100">{item.totalSesiones}</span></div></div><span className={`text-center font-mono-ui text-[9px] ${index % 2 === 0 ? 'text-foreground/65' : 'text-muted-foreground/40'}`}>{item.hora.replace(':00', 'h')}</span></div>)}</div>
-        <div className="mt-4 flex items-center gap-4 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary" />Sesiones reservadas</span><span className="ml-auto font-mono-ui text-[10px]">pico · 16:00 — 18 sesiones</span></div>
+
+  return (
+    <div className="space-y-8">
+      <PageIntro
+        eyebrow={introEyebrow}
+        title={introTitle}
+        detail={introDetail}
+        action={
+          <Link
+            href={isStudent ? '/catalog' : '/sessions'}
+            className="group inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground shadow-[0_6px_18px_hsl(var(--primary)/.2)] transition hover:-translate-y-0.5"
+            data-testid="link-dashboard-new-session"
+          >
+            <Plus size={15} /> {isStudent ? 'Solicitar tutoría' : 'Nueva sesión'}
+          </Link>
+        }
+      />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Sesiones activas" value={String(summary.activeSessions)} trend={`+${summary.sessionsChange}%`} detail="vs. semana anterior" tone="teal" />
+        <MetricCard label="Completadas" value={String(summary.completedSessions)} detail="últimos 30 días" tone="gold" />
+        <MetricCard label="Tasa de éxito" value={`${summary.successRate}%`} trend="+2.1 pp" detail="objetivo: 92%" tone="navy" />
+        <MetricCard label="Ingresos semanales" value={money(summary.weeklyRevenue)} trend={`+${summary.revenueChange}%`} detail="vs. semana anterior" tone="teal" />
+        <MetricCard label="Cancelaciones" value={String(summary.cancelledSessions)} trend="-3.4%" detail="últimos 30 días" tone="red" />
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.6fr_.9fr]">
+        <section className="rounded-2xl border border-card-border bg-card p-5 shadow-[0_8px_26px_hsl(var(--foreground)/.025)] md:p-6">
+          <SectionHeading eyebrow="Ritmo de demanda" title="Sesiones por hora" detail="Concentración de demanda durante el día" action={<button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" data-testid="button-demand-options"><MoreHorizontal size={17} /></button>} />
+          <div className="flex h-[220px] items-end gap-2 border-b border-border/70 pb-0 pt-5 sm:gap-3">{hourly.map((item, index) => <div key={item.hora} className="group flex h-full flex-1 flex-col justify-end gap-2"><div className="relative flex-1"><div className="absolute bottom-0 left-1/2 w-full -translate-x-1/2 rounded-t-lg bg-[hsl(var(--primary)/.13)] transition-all duration-300 group-hover:bg-[hsl(var(--primary)/.27)]" style={{ height: `${Math.max(9, item.totalSesiones / maxHour * 100)}%` }}><span className="absolute -top-6 left-1/2 -translate-x-1/2 font-mono-ui text-[9px] text-primary opacity-0 transition group-hover:opacity-100">{item.totalSesiones}</span></div></div><span className={`text-center font-mono-ui text-[9px] ${index % 2 === 0 ? 'text-foreground/65' : 'text-muted-foreground/40'}`}>{item.hora.replace(':00', 'h')}</span></div>)}</div>
+          <div className="mt-4 flex items-center gap-4 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary" />Sesiones reservadas</span><span className="ml-auto font-mono-ui text-[10px]">pico · 16:00 — 18 sesiones</span></div>
+        </section>
+        <section className="rounded-2xl border border-card-border bg-card p-5 shadow-[0_8px_26px_hsl(var(--foreground)/.025)] md:p-6">
+          <SectionHeading eyebrow="Salud del flujo" title="Distribución de estados" detail="Sobre el total de sesiones del período" />
+          <div className="mt-1 flex items-center gap-6"><div className="relative grid h-36 w-36 shrink-0 place-items-center rounded-full" style={{ background: 'conic-gradient(hsl(var(--primary)) 0 66%, hsl(var(--accent)) 66% 79%, hsl(var(--chart-5)) 79% 92%, hsl(var(--destructive)) 92% 100%)' }}><div className="grid h-24 w-24 place-items-center rounded-full bg-card"><p className="font-display text-2xl font-bold">173</p><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">sesiones</p></div></div><div className="min-w-0 flex-1 space-y-3">{[['FINALIZADA', '66%'], ['EN_CURSO', '13%'], ['AGENDADA', '13%'], ['CANCELADA', '8%']].map(([status, percentage]) => <div key={status} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${status === 'FINALIZADA' ? 'bg-primary' : status === 'EN_CURSO' ? 'bg-chart-5' : status === 'AGENDADA' ? 'bg-accent' : 'bg-destructive'}`} />{statusLabels[status]}</span><span className="font-mono-ui text-muted-foreground">{percentage}</span></div>)}</div></div>
+          <div className="mt-6 rounded-xl bg-muted/70 p-3.5"><div className="flex items-center gap-2 text-xs font-semibold"><Sparkles size={14} className="text-accent-foreground" /> Buen ritmo esta semana</div><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">La demanda de las tardes creció 18%. Considera abrir dos bloques adicionales.</p></div>
+        </section>
+      </div>
+      <section>
+        <SectionHeading
+          eyebrow={isStudent ? 'Mis Tutorías' : isCoordinator ? 'Por Confirmar' : 'Seguimiento inmediato'}
+          title={isStudent ? 'Próximas sesiones agendadas' : isCoordinator ? 'Sesiones pendientes de atención' : 'Lo que requiere contexto'}
+          detail={isStudent ? 'Tus encuentros académicos confirmados y por iniciar' : 'Las próximas sesiones que están en movimiento'}
+          action={<Link href="/sessions" className="text-xs font-bold text-primary" data-testid="link-dashboard-sessions">Ver todas <ArrowLink> </ArrowLink></Link>}
+        />
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {active.map((session) => <SessionMiniCard key={session.id} session={session} />)}
+        </div>
       </section>
-      <section className="rounded-2xl border border-card-border bg-card p-5 shadow-[0_8px_26px_hsl(var(--foreground)/.025)] md:p-6">
-        <SectionHeading eyebrow="Salud del flujo" title="Distribución de estados" detail="Sobre el total de sesiones del período" />
-        <div className="mt-1 flex items-center gap-6"><div className="relative grid h-36 w-36 shrink-0 place-items-center rounded-full" style={{ background: 'conic-gradient(hsl(var(--primary)) 0 66%, hsl(var(--accent)) 66% 79%, hsl(var(--chart-5)) 79% 92%, hsl(var(--destructive)) 92% 100%)' }}><div className="grid h-24 w-24 place-items-center rounded-full bg-card"><p className="font-display text-2xl font-bold">173</p><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">sesiones</p></div></div><div className="min-w-0 flex-1 space-y-3">{[['FINALIZADA', '66%'], ['EN_CURSO', '13%'], ['AGENDADA', '13%'], ['CANCELADA', '8%']].map(([status, percentage]) => <div key={status} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${status === 'FINALIZADA' ? 'bg-primary' : status === 'EN_CURSO' ? 'bg-chart-5' : status === 'AGENDADA' ? 'bg-accent' : 'bg-destructive'}`} />{statusLabels[status]}</span><span className="font-mono-ui text-muted-foreground">{percentage}</span></div>)}</div></div>
-        <div className="mt-6 rounded-xl bg-muted/70 p-3.5"><div className="flex items-center gap-2 text-xs font-semibold"><Sparkles size={14} className="text-accent-foreground" /> Buen ritmo esta semana</div><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">La demanda de las tardes creció 18%. Considera abrir dos bloques adicionales.</p></div>
+      <section>
+        <SectionHeading eyebrow="Acceso rápido" title="Módulos de trabajo" />
+        <div className="grid gap-3 md:grid-cols-3">
+          <ModuleCard href="/catalog" icon={<BookOpenIcon />} number="01" title="Explorar catálogo" detail="Encuentra el acompañamiento correcto y agenda en minutos." />
+          <ModuleCard href="/sessions" icon={<CalendarClock size={19} />} number="02" title="Operar sesiones" detail="Mueve cada sesión con claridad, desde agendada hasta finalizada." />
+          <ModuleCard href="/analytics" icon={<BarChart3 size={19} />} number="03" title="Entender resultados" detail="Lee la demanda y convierte actividad en decisiones." />
+        </div>
       </section>
     </div>
-    <section><SectionHeading eyebrow="Seguimiento inmediato" title="Lo que requiere contexto" detail="Las próximas sesiones que están en movimiento" action={<Link href="/sessions" className="text-xs font-bold text-primary" data-testid="link-dashboard-sessions">Ver todas <ArrowLink> </ArrowLink></Link>} /><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{active.map((session) => <SessionMiniCard key={session.id} session={session} />)}</div></section>
-    <section><SectionHeading eyebrow="Acceso rápido" title="Módulos de trabajo" /><div className="grid gap-3 md:grid-cols-3"><ModuleCard href="/catalog" icon={<BookOpenIcon />} number="01" title="Explorar catálogo" detail="Encuentra el acompañamiento correcto y agenda en minutos." /><ModuleCard href="/sessions" icon={<CalendarClock size={19} />} number="02" title="Operar sesiones" detail="Mueve cada sesión con claridad, desde agendada hasta finalizada." /><ModuleCard href="/analytics" icon={<BarChart3 size={19} />} number="03" title="Entender resultados" detail="Lee la demanda y convierte actividad en decisiones." /></div></section>
-  </div>;
+  );
 }
 
 function BookOpenIcon() { return <span className="font-display text-[22px] leading-none">01</span>; }
@@ -293,15 +371,36 @@ function Insight({ icon, title, detail, tone }: { icon: React.ReactNode; title: 
 export function AuditPage() {
   const { mockMode, audit: localAudit } = useWorkspace();
   const [eventType, setEventType] = useState('');
+  const [userFilter, setUserFilter] = useState('');
   const [limit, setLimit] = useState('50');
   const [expanded, setExpanded] = useState<string | null>(null);
   const params = useMemo(() => ({ eventType: eventType || undefined, limit: Number(limit) }), [eventType, limit]);
   const auditQuery = useListAuditEvents(params, { query: { enabled: !mockMode, queryKey: getListAuditEventsQueryKey(params) } });
-  const events = (mockMode ? localAudit : auditQuery.data ?? []).filter((event) => !eventType || event.eventoTipo === eventType).slice(0, Number(limit));
+  const events = (mockMode ? localAudit : auditQuery.data ?? [])
+    .filter((event) => !eventType || event.eventoTipo === eventType)
+    .filter((event) => !userFilter || event.usuario.toLowerCase().includes(userFilter.toLowerCase()))
+    .slice(0, Number(limit));
   const types = [...new Set(localAudit.map((event) => event.eventoTipo))];
   return <div className="space-y-7">
     <PageIntro eyebrow="Control · Auditoría" title="Todo cambio deja una señal." detail="Consulta la historia operativa del workspace con contexto suficiente para investigar, entender y actuar." action={<div className="flex items-center gap-2 rounded-xl bg-[hsl(var(--primary)/.1)] px-3 py-2.5 text-[11px] font-semibold text-primary"><ShieldCheckIcon /> Registro íntegro</div>} />
-    <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 md:flex-row md:items-end"><SelectField label="Tipo de evento" value={eventType} onChange={setEventType} options={types.map((type) => ({ value: type, label: type.replaceAll('_', ' ') }))} testId="select-audit-event" /><SelectField label="Registros" value={limit} onChange={setLimit} options={['25', '50', '100'].map((value) => ({ value, label: value }))} testId="select-audit-limit" /><button onClick={() => { setEventType(''); setLimit('50'); }} className="mb-0.5 rounded-xl px-3 py-2.5 text-xs font-bold text-muted-foreground hover:bg-muted" data-testid="button-clear-audit">Limpiar filtros</button></div>
+    <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 md:flex-row md:items-end">
+      <div className="flex-1">
+        <span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Filtrar por usuario</span>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-3 text-muted-foreground" />
+          <input
+            value={userFilter}
+            onChange={(event) => setUserFilter(event.target.value)}
+            placeholder="Buscar por usuario (ej. student, admin, tutor)..."
+            className="w-full rounded-xl border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-primary"
+            data-testid="input-audit-user"
+          />
+        </div>
+      </div>
+      <SelectField label="Tipo de evento" value={eventType} onChange={setEventType} options={types.map((type) => ({ value: type, label: type.replaceAll('_', ' ') }))} testId="select-audit-event" />
+      <SelectField label="Registros" value={limit} onChange={setLimit} options={['25', '50', '100'].map((value) => ({ value, label: value }))} testId="select-audit-limit" />
+      <button onClick={() => { setEventType(''); setUserFilter(''); setLimit('50'); }} className="mb-0.5 rounded-xl px-3 py-2.5 text-xs font-bold text-muted-foreground hover:bg-muted" data-testid="button-clear-audit">Limpiar filtros</button>
+    </div>
     {!mockMode && auditQuery.isLoading ? <SkeletonRows count={5} /> : !mockMode && auditQuery.isError ? <ErrorState onRetry={() => void auditQuery.refetch()} /> : events.length === 0 ? <EmptyState title="No hay eventos para mostrar" detail="Cambia los filtros para ampliar la ventana de auditoría." /> : <div className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-[0_8px_26px_hsl(var(--foreground)/.025)]"><div className="hidden grid-cols-[1fr_1.8fr_1fr_1.2fr_1fr_.4fr] gap-3 border-b border-border/70 bg-muted/40 px-5 py-3 font-mono-ui text-[9px] uppercase tracking-[.13em] text-muted-foreground md:grid"><span>Evento</span><span>Origen</span><span>Usuario</span><span>Fecha</span><span>Resultado</span><span /></div>{events.map((event) => <div key={event.id} className="border-b border-border/60 last:border-b-0"><div className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_1.8fr_1fr_1.2fr_1fr_.4fr] md:items-center"><div><p className="font-mono-ui text-[10px] text-primary">{event.id}</p><p className="mt-1 text-[11px] font-bold">{event.eventoTipo.replaceAll('_', ' ')}</p></div><p className="text-xs text-muted-foreground">{event.origen}</p><p className="text-xs">{event.usuario}</p><p className="text-xs text-muted-foreground">{dateTime(event.fechaTimestamp)}</p><StatusPill status={event.resultado} /><button onClick={() => setExpanded(expanded === event.id ? null : event.id)} className="flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted" data-testid={`button-expand-audit-${event.id}`}><ChevronDown size={15} className={expanded === event.id ? 'rotate-180 transition' : 'transition'} /></button></div>{expanded === event.id && <div className="mx-5 mb-4 rounded-xl bg-[hsl(var(--foreground)/.94)] p-4 text-[11px] text-[hsl(var(--background))]"><pre className="overflow-auto whitespace-pre-wrap font-mono-ui leading-relaxed">{JSON.stringify(event.payloadJson, null, 2)}</pre></div>}</div>)}</div>}
     <p className="font-mono-ui text-[10px] uppercase tracking-[.13em] text-muted-foreground">Mostrando {events.length} de la ventana seleccionada · UTC−06:00</p>
   </div>;

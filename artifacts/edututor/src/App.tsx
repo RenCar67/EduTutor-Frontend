@@ -38,7 +38,7 @@ function AdminReportsRoute() {
 
 function AdminAuditRoute() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
       <AuditPage />
     </ProtectedRoute>
   );
@@ -52,9 +52,11 @@ function WorkspaceRoutes() {
           <AppShell>
             <Switch>
               <Route path="/" component={DashboardPage} />
+              <Route path="/dashboard" component={DashboardPage} />
               <Route path="/catalog" component={CatalogPage} />
               <Route path="/sessions" component={SessionsPage} />
               <Route path="/analytics" component={AdminReportsRoute} />
+              <Route path="/reports" component={AdminReportsRoute} />
               <Route path="/reportes" component={AdminReportsRoute} />
               <Route path="/audit" component={AdminAuditRoute} />
               <Route path="/auditoria" component={AdminAuditRoute} />
