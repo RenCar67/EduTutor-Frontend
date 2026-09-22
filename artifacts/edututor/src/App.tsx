@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import { PublicClientApplication } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -12,7 +11,7 @@ import { AuthProvider } from '@/auth/auth-context';
 import { ProtectedRoute } from '@/auth/protected-route';
 import { ForbiddenPage } from '@/pages/forbidden';
 import { LoginPage } from '@/pages/login';
-import { msalConfig } from '@/auth/authConfig';
+import { msalInstance } from '@/msal';
 import { setBaseUrl } from '@workspace/api-client-react';
 import {
   Route,
@@ -26,11 +25,13 @@ if (import.meta.env.VITE_API_BASE_URL) {
 }
 
 const queryClient = new QueryClient();
-const msalInstance = new PublicClientApplication(msalConfig);
 
+// El BFF autoriza estos módulos a ADMIN y AUDITOR (ReportController/AuditController
+// usan hasAnyRole('ADMIN', 'AUDITOR')) — debe coincidir o un Auditor real
+// quedaría bloqueado aquí aunque el backend sí lo autorice.
 function AdminReportsRoute() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
       <AnalyticsPage />
     </ProtectedRoute>
   );
@@ -38,7 +39,7 @@ function AdminReportsRoute() {
 
 function AdminAuditRoute() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
       <AuditPage />
     </ProtectedRoute>
   );
