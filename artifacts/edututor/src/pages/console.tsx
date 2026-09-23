@@ -38,15 +38,36 @@ function PageIntro({ eyebrow, title, detail, action }: { eyebrow: string; title:
   return <div className="mb-8 flex flex-wrap items-start justify-between gap-4"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-primary">{eyebrow}</p><h2 className="mt-2 max-w-3xl font-display text-[30px] font-bold leading-[1.05] tracking-tight md:text-[38px]">{title}</h2><p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">{detail}</p></div>{action}</div>;
 }
 
+// El BFF restringe /api/report/* a ADMIN/AUDITOR y /api/sessions a
+// ADMIN/COORDINADOR/ESTUDIANTE — ningún rol tiene ambos. El Dashboard, que ven
+// todos al entrar, no puede depender por completo de ninguno de los dos: cada
+// sección se muestra solo si su fuente de datos está disponible para el rol.
+function isForbidden(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'status' in error && (error as { status?: number }).status === 403;
+}
+
 export function DashboardPage() {
   const { mockMode, kpis: localKpis, sessions: localSessions, services } = useWorkspace();
-  const kpisQuery = useGetReportKpis(undefined, { query: { enabled: !mockMode, queryKey: getGetReportKpisQueryKey() } });
-  const sessionsQuery = useListSessions(undefined, { query: { enabled: !mockMode, queryKey: getListSessionsQueryKey() } });
+  const kpisQuery = useGetReportKpis(undefined, { query: { enabled: !mockMode, queryKey: getGetReportKpisQueryKey(), retry: false } });
+  const sessionsQuery = useListSessions(undefined, { query: { enabled: !mockMode, queryKey: getListSessionsQueryKey(), retry: false } });
   const kpis = mockMode ? localKpis : kpisQuery.data;
-  const sessions = mockMode ? localSessions : sessionsQuery.data ?? [];
+  const sessions = mockMode ? localSessions : Array.isArray(sessionsQuery.data) ? sessionsQuery.data : [];
   const active = sessions.filter((session) => ['SOLICITADA', 'CONFIRMADA', 'ASIGNADA', 'EN_CURSO'].includes(session.estado)).slice(0, 5);
+  const kpisForbidden = !mockMode && isForbidden(kpisQuery.error);
+  const sessionsForbidden = !mockMode && isForbidden(sessionsQuery.error);
   if (!mockMode && (kpisQuery.isLoading || sessionsQuery.isLoading)) return <><PageIntro eyebrow="Resumen operativo" title="El pulso de tus operaciones." detail="Una vista tranquila para saber qué necesita atención y qué está avanzando bien." /><SkeletonRows count={5} /></>;
-  if (!mockMode && (kpisQuery.isError || sessionsQuery.isError)) return <ErrorState onRetry={() => { void kpisQuery.refetch(); void sessionsQuery.refetch(); }} />;
+  if (!mockMode && kpisQuery.isError && !kpisForbidden && sessionsQuery.isError && !sessionsForbidden) return <ErrorState onRetry={() => { void kpisQuery.refetch(); void sessionsQuery.refetch(); }} />;
+  const showKpis = Boolean(kpis) && !kpisForbidden;
+  const showSessions = !sessionsForbidden;
+  if (!showKpis) {
+    return <div className="space-y-8">
+      <PageIntro eyebrow="Resumen operativo" title="El pulso de tus operaciones." detail="Una vista tranquila para saber qué necesita atención y qué está avanzando bien." action={<Link href="/sessions" className="group inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground shadow-[0_6px_18px_hsl(var(--primary)/.2)] transition hover:-translate-y-0.5" data-testid="link-dashboard-new-session"><Plus size={15} /> Nueva sesión</Link>} />
+      {kpisForbidden && <div className="rounded-2xl border border-card-border bg-card p-4 text-xs text-muted-foreground">Tu rol no tiene acceso a las métricas agregadas (solo Admin y Auditor). Puedes seguir operando sesiones abajo.</div>}
+      {!kpisForbidden && !mockMode && kpisQuery.isError && <ErrorState onRetry={() => void kpisQuery.refetch()} />}
+      {showSessions ? <section><SectionHeading eyebrow="Seguimiento inmediato" title="Lo que requiere contexto" detail="Las próximas sesiones que están en movimiento" action={<Link href="/sessions" className="text-xs font-bold text-primary" data-testid="link-dashboard-sessions">Ver todas <ArrowLink> </ArrowLink></Link>} /><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{active.map((session) => <SessionMiniCard key={session.id} session={session} services={services} />)}</div></section> : <div className="rounded-2xl border border-card-border bg-card p-4 text-xs text-muted-foreground">Tu rol no tiene acceso a la operación de sesiones (Admin, Coordinador o Estudiante).</div>}
+      <section><SectionHeading eyebrow="Acceso rápido" title="Módulos de trabajo" /><div className="grid gap-3 md:grid-cols-3"><ModuleCard href="/catalog" icon={<BookOpenIcon />} number="01" title="Explorar catálogo" detail="Encuentra el acompañamiento correcto y agenda en minutos." /><ModuleCard href="/sessions" icon={<CalendarClock size={19} />} number="02" title="Operar sesiones" detail="Mueve cada sesión con claridad, desde solicitada hasta realizada." /><ModuleCard href="/analytics" icon={<BarChart3 size={19} />} number="03" title="Entender resultados" detail="Lee la demanda y convierte actividad en decisiones." /></div></section>
+    </div>;
+  }
   if (!kpis) return null;
   const hourly = kpis.sesionesPorHora;
   const maxHour = Math.max(...hourly.map((item) => item.creadas), 1);
@@ -84,7 +105,7 @@ export function DashboardPage() {
         <div className="mt-1 flex items-center gap-6"><div className="relative grid h-36 w-36 shrink-0 place-items-center rounded-full" style={{ background: totalSessions === 0 ? 'hsl(var(--muted))' : `conic-gradient(${gradientStops})` }}><div className="grid h-24 w-24 place-items-center rounded-full bg-card"><p className="font-display text-2xl font-bold">{totalSessions}</p><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">sesiones</p></div></div><div className="min-w-0 flex-1 space-y-3">{donutSegments.map((seg) => <div key={seg.estado} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${seg.color}`} />{statusLabels[seg.estado] ?? seg.estado}</span><span className="font-mono-ui text-muted-foreground">{Math.round(seg.pct)}%</span></div>)}</div></div>
       </section>
     </div>
-    <section><SectionHeading eyebrow="Seguimiento inmediato" title="Lo que requiere contexto" detail="Las próximas sesiones que están en movimiento" action={<Link href="/sessions" className="text-xs font-bold text-primary" data-testid="link-dashboard-sessions">Ver todas <ArrowLink> </ArrowLink></Link>} /><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{active.map((session) => <SessionMiniCard key={session.id} session={session} services={services} />)}</div></section>
+    {showSessions && <section><SectionHeading eyebrow="Seguimiento inmediato" title="Lo que requiere contexto" detail="Las próximas sesiones que están en movimiento" action={<Link href="/sessions" className="text-xs font-bold text-primary" data-testid="link-dashboard-sessions">Ver todas <ArrowLink> </ArrowLink></Link>} /><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{active.map((session) => <SessionMiniCard key={session.id} session={session} services={services} />)}</div></section>}
     <section><SectionHeading eyebrow="Acceso rápido" title="Módulos de trabajo" /><div className="grid gap-3 md:grid-cols-3"><ModuleCard href="/catalog" icon={<BookOpenIcon />} number="01" title="Explorar catálogo" detail="Encuentra el acompañamiento correcto y agenda en minutos." /><ModuleCard href="/sessions" icon={<CalendarClock size={19} />} number="02" title="Operar sesiones" detail="Mueve cada sesión con claridad, desde solicitada hasta realizada." /><ModuleCard href="/analytics" icon={<BarChart3 size={19} />} number="03" title="Entender resultados" detail="Lee la demanda y convierte actividad en decisiones." /></div></section>
   </div>;
 }
@@ -112,7 +133,7 @@ export function CatalogPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const servicesQuery = useListServices({ query: { enabled: !mockMode, queryKey: getListServicesQueryKey() } });
-  const services = (mockMode ? localServices : servicesQuery.data ?? []).filter((service) => service.estado === 'ACTIVO' && (!search || `${service.nombre} ${service.descripcion}`.toLowerCase().includes(search.toLowerCase())) && (!category || service.categoria === category) && (!maxPrice || service.precioHora <= Number(maxPrice)));
+  const services = (mockMode ? localServices : (Array.isArray(servicesQuery.data) ? servicesQuery.data : [])).filter((service) => service.estado === 'ACTIVO' && (!search || `${service.nombre} ${service.descripcion}`.toLowerCase().includes(search.toLowerCase())) && (!category || service.categoria === category) && (!maxPrice || service.precioHora <= Number(maxPrice)));
   const categories = [...new Set(localServices.map((service) => service.categoria))];
   const create = (input: SesionInput) => {
     if (mockMode) {
@@ -174,13 +195,13 @@ export function SessionsPage() {
   const queryClient = useQueryClient();
   const sessionsQuery = useListSessions(undefined, { query: { enabled: !mockMode, queryKey: getListSessionsQueryKey() } });
   const servicesQuery = useListServices({ query: { enabled: !mockMode, queryKey: getListServicesQueryKey() } });
-  const services = mockMode ? localServices : servicesQuery.data ?? [];
+  const services = mockMode ? localServices : (Array.isArray(servicesQuery.data) ? servicesQuery.data : []);
   const transitionMutation = useTransitionSession();
   const createMutation = useCreateSession();
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const allSessions = mockMode ? localSessions : sessionsQuery.data ?? [];
+  const allSessions = mockMode ? localSessions : (Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []);
   const filtered = allSessions.filter((session) => (!status || session.estado === status) && (!search || `${session.id} ${resolveServicioNombre(session, services)} ${resolveTutorNombre(session)}`.toLowerCase().includes(search.toLowerCase())));
   const transition = (session: Sesion, next: EstadoSesion) => {
     if (mockMode) {
@@ -294,8 +315,8 @@ export function AnalyticsPage() {
   const topServicesQuery = useGetTopServices(undefined, { query: { enabled: !mockMode, queryKey: getGetTopServicesQueryKey() } });
   const servicesQuery = useListServices({ query: { enabled: !mockMode, queryKey: getListServicesQueryKey() } });
   const kpis = mockMode ? localKpis : kpisQuery.data;
-  const topServices = mockMode ? localTopServices : topServicesQuery.data ?? [];
-  const services = mockMode ? localServices : servicesQuery.data ?? [];
+  const topServices = mockMode ? localTopServices : (Array.isArray(topServicesQuery.data) ? topServicesQuery.data : []);
+  const services = mockMode ? localServices : (Array.isArray(servicesQuery.data) ? servicesQuery.data : []);
   // El backend real solo trackea conteos, no montos — el ingreso se estima
   // aquí como solicitudes x precioHora del servicio en el catálogo actual.
   const ranked = topServices
@@ -338,7 +359,7 @@ export function AuditPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const params = useMemo(() => ({ tipo: eventType || undefined }), [eventType]);
   const auditQuery = useListAuditEvents(params, { query: { enabled: !mockMode, queryKey: getListAuditEventsQueryKey(params) } });
-  const events = (mockMode ? localAudit : auditQuery.data ?? []).filter((event) => !eventType || event.eventoTipo === eventType).slice(0, Number(limit));
+  const events = (mockMode ? localAudit : (Array.isArray(auditQuery.data) ? auditQuery.data : [])).filter((event) => !eventType || event.eventoTipo === eventType).slice(0, Number(limit));
   const types = [...new Set(localAudit.map((event) => event.eventoTipo))];
   return <div className="space-y-7">
     <PageIntro eyebrow="Control · Auditoría" title="Todo cambio deja una señal." detail="Consulta la historia operativa del workspace con contexto suficiente para investigar, entender y actuar." action={<div className="flex items-center gap-2 rounded-xl bg-[hsl(var(--primary)/.1)] px-3 py-2.5 text-[11px] font-semibold text-primary"><ShieldCheckIcon /> Registro íntegro</div>} />
