@@ -15,24 +15,25 @@
 import { Router, type IRouter } from "express";
 import {
   CreateSessionBody,
-  GetAnalyticsSummaryResponse,
-  GetDailyMetricsResponse,
-  GetHourlyMetricsResponse,
   ListAuditEventsQueryParams,
   ListAuditEventsResponse,
-  ListServicesQueryParams,
   ListServicesResponse,
   ListSessionsQueryParams,
   ListSessionsResponse,
+  GetReportKpisResponse,
+  GetTopServicesResponse,
   TransitionSessionBody,
   TransitionSessionParams,
 } from "@workspace/api-zod";
 
+// SOLICITADA -> CONFIRMADA -> ASIGNADA -> EN_CURSO -> REALIZADA, o CANCELADA
+// desde cualquier estado previo a EN_CURSO (calca ms-edututor-sessions real).
 type SessionStatus =
-  | "AGENDADA"
+  | "SOLICITADA"
   | "CONFIRMADA"
+  | "ASIGNADA"
   | "EN_CURSO"
-  | "FINALIZADA"
+  | "REALIZADA"
   | "CANCELADA";
 
 const services = [
@@ -46,6 +47,9 @@ const services = [
     precioHora: 24,
     duracionMinutos: 60,
     estado: "ACTIVO" as const,
+    cupoTotal: 10,
+    cupoDisponible: 6,
+    bloqueHorario: "Lun-Mié 15:00-16:00",
   },
   {
     id: "svc-002",
@@ -57,6 +61,9 @@ const services = [
     precioHora: 20,
     duracionMinutos: 45,
     estado: "ACTIVO" as const,
+    cupoTotal: 12,
+    cupoDisponible: 8,
+    bloqueHorario: "Mar-Jue 13:00-13:45",
   },
   {
     id: "svc-003",
@@ -68,6 +75,9 @@ const services = [
     precioHora: 32,
     duracionMinutos: 60,
     estado: "ACTIVO" as const,
+    cupoTotal: 8,
+    cupoDisponible: 3,
+    bloqueHorario: "Vie 17:00-18:00",
   },
   {
     id: "svc-004",
@@ -79,6 +89,9 @@ const services = [
     precioHora: 28,
     duracionMinutos: 60,
     estado: "ACTIVO" as const,
+    cupoTotal: 10,
+    cupoDisponible: 5,
+    bloqueHorario: "Lun-Vie 09:00-10:00",
   },
   {
     id: "svc-005",
@@ -90,6 +103,9 @@ const services = [
     precioHora: 22,
     duracionMinutos: 45,
     estado: "ACTIVO" as const,
+    cupoTotal: 9,
+    cupoDisponible: 7,
+    bloqueHorario: "Mié-Vie 16:00-16:45",
   },
 ];
 
@@ -102,7 +118,8 @@ const sessions = [
     tutorNombre: "Camila Pérez",
     servicioNombre: "Programación desde cero",
     fechaHora: "2026-09-21T10:00:00.000Z",
-    estado: "CONFIRMADA" as SessionStatus,
+    fechaSolicitud: "2026-09-18T10:00:00.000Z",
+    estado: "ASIGNADA" as SessionStatus,
     observaciones: "Revisar arrays y funciones antes del proyecto final.",
   },
   {
@@ -113,7 +130,8 @@ const sessions = [
     tutorNombre: "Valentina Soto",
     servicioNombre: "Álgebra y cálculo",
     fechaHora: "2026-09-21T15:30:00.000Z",
-    estado: "AGENDADA" as SessionStatus,
+    fechaSolicitud: "2026-09-19T09:00:00.000Z",
+    estado: "SOLICITADA" as SessionStatus,
     observaciones: "Preparación para control de derivadas.",
   },
   {
@@ -124,6 +142,7 @@ const sessions = [
     tutorNombre: "Tomás Rojas",
     servicioNombre: "Inglés conversacional",
     fechaHora: "2026-09-20T18:00:00.000Z",
+    fechaSolicitud: "2026-09-17T12:00:00.000Z",
     estado: "EN_CURSO" as SessionStatus,
     observaciones: "Role-play de entrevista laboral.",
   },
@@ -135,17 +154,19 @@ const sessions = [
     tutorNombre: "Diego Muñoz",
     servicioNombre: "Química universitaria",
     fechaHora: "2026-09-19T12:00:00.000Z",
-    estado: "FINALIZADA" as SessionStatus,
+    fechaSolicitud: "2026-09-15T08:00:00.000Z",
+    estado: "REALIZADA" as SessionStatus,
     observaciones: "Se completó la guía de equilibrio químico.",
   },
   {
     id: "ses-1005",
     servicioId: "svc-005",
     estudianteId: "student-003",
-    tutorId: "tutor-005",
-    tutorNombre: "Javiera Vidal",
+    tutorId: undefined as string | undefined,
+    tutorNombre: undefined as string | undefined,
     servicioNombre: "Escritura académica",
     fechaHora: "2026-09-18T16:00:00.000Z",
+    fechaSolicitud: "2026-09-16T08:00:00.000Z",
     estado: "CANCELADA" as SessionStatus,
     observaciones: "Cancelada por el estudiante con 24 horas de anticipación.",
   },
@@ -162,125 +183,60 @@ const auditEvents: Array<{
 }> = [
   {
     id: "evt-9001",
-    eventoTipo: "CAMBIO_ESTADO",
+    eventoTipo: "SESSION_STATE_CHANGED",
     origen: "ms-edututor-sessions",
-    usuario: "admin@edututor.cl",
+    usuario: "student-002",
     fechaTimestamp: "2026-09-20T16:42:00.000Z",
-    payloadJson: {
-      sessionId: "ses-1003",
-      from: "CONFIRMADA",
-      to: "EN_CURSO",
-    },
-    resultado: "EXITOSO" as const,
+    payloadJson: { sessionId: "ses-1003", estadoAnterior: "CONFIRMADA", estadoNuevo: "EN_CURSO", tutorId: "tutor-002" },
+    resultado: "EXITOSO",
   },
   {
     id: "evt-9002",
-    eventoTipo: "CREACION_SESION",
-    origen: "ms-edututor-bff",
-    usuario: "student@edututor.cl",
+    eventoTipo: "SESSION_CREATED",
+    origen: "ms-edututor-sessions",
+    usuario: "student-001",
     fechaTimestamp: "2026-09-20T15:10:00.000Z",
-    payloadJson: {
-      sessionId: "ses-1002",
-      serviceId: "svc-001",
-      channel: "web",
-    },
-    resultado: "EXITOSO" as const,
+    payloadJson: { sessionId: "ses-1002", servicioId: "svc-001" },
+    resultado: "EXITOSO",
   },
   {
     id: "evt-9003",
-    eventoTipo: "CANCELACION",
+    eventoTipo: "SESSION_STATE_CHANGED",
     origen: "ms-edututor-sessions",
     usuario: "student-003",
     fechaTimestamp: "2026-09-20T13:28:00.000Z",
-    payloadJson: {
-      sessionId: "ses-1005",
-      reason: "Cambio de horario",
-    },
-    resultado: "EXITOSO" as const,
-  },
-  {
-    id: "evt-9004",
-    eventoTipo: "CAMBIO_ESTADO",
-    origen: "ms-edututor-sessions",
-    usuario: "tutor-002",
-    fechaTimestamp: "2026-09-20T11:05:00.000Z",
-    payloadJson: {
-      sessionId: "ses-1003",
-      from: "AGENDADA",
-      to: "FINALIZADA",
-      error: "IllegalStateTransitionException",
-    },
-    resultado: "ERROR" as const,
+    payloadJson: { sessionId: "ses-1005", estadoAnterior: "SOLICITADA", estadoNuevo: "CANCELADA", tutorId: "" },
+    resultado: "EXITOSO",
   },
 ];
 
+// Aproxima lo que ms-edututor-report calcula en /api/report/kpis: conteo por
+// hora y gauge de estados activos, sobre el rango solicitado (no persistido,
+// solo demo).
 const hourlyMetrics = [
-  { hora: "08:00", totalSesiones: 8, tasaExito: 92 },
-  { hora: "10:00", totalSesiones: 14, tasaExito: 96 },
-  { hora: "12:00", totalSesiones: 11, tasaExito: 94 },
-  { hora: "14:00", totalSesiones: 18, tasaExito: 97 },
-  { hora: "16:00", totalSesiones: 22, tasaExito: 95 },
-  { hora: "18:00", totalSesiones: 27, tasaExito: 93 },
-  { hora: "20:00", totalSesiones: 16, tasaExito: 91 },
+  { hora: "2026-09-21T08:00:00.000Z", creadas: 8, realizadas: 7, canceladas: 1 },
+  { hora: "2026-09-21T10:00:00.000Z", creadas: 14, realizadas: 13, canceladas: 0 },
+  { hora: "2026-09-21T12:00:00.000Z", creadas: 11, realizadas: 10, canceladas: 1 },
+  { hora: "2026-09-21T14:00:00.000Z", creadas: 18, realizadas: 16, canceladas: 1 },
+  { hora: "2026-09-21T16:00:00.000Z", creadas: 22, realizadas: 20, canceladas: 1 },
+  { hora: "2026-09-21T18:00:00.000Z", creadas: 27, realizadas: 24, canceladas: 2 },
+  { hora: "2026-09-21T20:00:00.000Z", creadas: 16, realizadas: 14, canceladas: 1 },
 ];
 
-const dailyMetrics = [
-  {
-    fecha: "2026-09-14",
-    servicioId: "svc-003",
-    servicioNombre: "Programación desde cero",
-    ingresos: 384,
-    sesionesTotales: 12,
-  },
-  {
-    fecha: "2026-09-15",
-    servicioId: "svc-001",
-    servicioNombre: "Álgebra y cálculo",
-    ingresos: 312,
-    sesionesTotales: 13,
-  },
-  {
-    fecha: "2026-09-16",
-    servicioId: "svc-002",
-    servicioNombre: "Inglés conversacional",
-    ingresos: 280,
-    sesionesTotales: 14,
-  },
-  {
-    fecha: "2026-09-17",
-    servicioId: "svc-004",
-    servicioNombre: "Química universitaria",
-    ingresos: 336,
-    sesionesTotales: 12,
-  },
-  {
-    fecha: "2026-09-18",
-    servicioId: "svc-005",
-    servicioNombre: "Escritura académica",
-    ingresos: 264,
-    sesionesTotales: 12,
-  },
-  {
-    fecha: "2026-09-19",
-    servicioId: "svc-003",
-    servicioNombre: "Programación desde cero",
-    ingresos: 448,
-    sesionesTotales: 14,
-  },
-  {
-    fecha: "2026-09-20",
-    servicioId: "svc-001",
-    servicioNombre: "Álgebra y cálculo",
-    ingresos: 360,
-    sesionesTotales: 15,
-  },
+const topServices = [
+  { servicioId: "svc-003", totalSolicitudes: 14 },
+  { servicioId: "svc-001", totalSolicitudes: 13 },
+  { servicioId: "svc-002", totalSolicitudes: 12 },
+  { servicioId: "svc-004", totalSolicitudes: 10 },
+  { servicioId: "svc-005", totalSolicitudes: 8 },
 ];
 
 const allowedTransitions: Record<SessionStatus, SessionStatus[]> = {
-  AGENDADA: ["CONFIRMADA", "CANCELADA"],
-  CONFIRMADA: ["EN_CURSO", "CANCELADA"],
-  EN_CURSO: ["FINALIZADA"],
-  FINALIZADA: [],
+  SOLICITADA: ["CONFIRMADA", "CANCELADA"],
+  CONFIRMADA: ["ASIGNADA", "CANCELADA"],
+  ASIGNADA: ["EN_CURSO", "CANCELADA"],
+  EN_CURSO: ["REALIZADA"],
+  REALIZADA: [],
   CANCELADA: [],
 };
 
@@ -288,7 +244,7 @@ function createAuditEvent(eventoTipo: string, payloadJson: Record<string, unknow
   auditEvents.unshift({
     id: `evt-${Date.now()}`,
     eventoTipo,
-    origen: "ms-edututor-bff",
+    origen: "ms-edututor-sessions",
     usuario: "demo-user",
     fechaTimestamp: new Date().toISOString(),
     payloadJson,
@@ -311,55 +267,28 @@ router.use((req, _res, next) => {
 });
 
 // ============================================================================
-// 1. CATALOG CONTROLLER (/api/v1/catalog/... and /api/v1/services)
+// 1. CATALOG CONTROLLER (/api/catalog/services)
 // ============================================================================
-const handleListServices = (req: any, res: any) => {
-  const parsed = ListServicesQueryParams.safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Parámetros de catálogo inválidos." });
-    return;
-  }
-
-  const { search, category, maxPrice } = parsed.data;
-  const normalizedSearch = search?.toLowerCase();
-  const filtered = services.filter((service) => {
-    const matchesSearch =
-      !normalizedSearch ||
-      `${service.nombre} ${service.descripcion} ${service.tutorNombre}`
-        .toLowerCase()
-        .includes(normalizedSearch);
-    const matchesCategory = !category || service.categoria === category;
-    const matchesPrice =
-      maxPrice === undefined || service.precioHora <= Number(maxPrice);
-    return matchesSearch && matchesCategory && matchesPrice;
-  });
-
-  res.json(ListServicesResponse.parse(filtered));
-};
-
-router.get("/v1/catalog/services", handleListServices);
-router.get("/v1/services", handleListServices);
+router.get("/catalog/services", (_req, res) => {
+  res.json(ListServicesResponse.parse(services));
+});
 
 // ============================================================================
-// 2. SESSIONS CONTROLLER (/api/v1/sessions/...)
+// 2. SESSIONS CONTROLLER (/api/sessions/...)
 // ============================================================================
-router.get("/v1/sessions", (req, res) => {
+router.get("/sessions", (req, res) => {
   const parsed = ListSessionsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Parámetros de sesiones inválidos." });
     return;
   }
 
-  const { status, studentId } = parsed.data;
-  const filtered = sessions.filter(
-    (session) =>
-      (!status || session.estado === status) &&
-      (!studentId || session.estudianteId === studentId),
-  );
+  const { status } = parsed.data;
+  const filtered = sessions.filter((session) => !status || session.estado === status);
   res.json(ListSessionsResponse.parse(filtered));
 });
 
-router.post("/v1/sessions", (req, res) => {
+router.post("/sessions", (req, res) => {
   const parsed = CreateSessionBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Los datos de la sesión son inválidos." });
@@ -377,21 +306,24 @@ router.post("/v1/sessions", (req, res) => {
     servicioId: service.id,
     estudianteId: parsed.data.estudianteId,
     tutorId: parsed.data.tutorId,
-    tutorNombre: service.tutorNombre,
+    tutorNombre: parsed.data.tutorId ? service.tutorNombre : undefined,
     servicioNombre: service.nombre,
-    fechaHora: parsed.data.fechaHora.toISOString(),
-    estado: "AGENDADA" as SessionStatus,
+    fechaHora: parsed.data.fechaHora?.toISOString() ?? new Date().toISOString(),
+    fechaSolicitud: new Date().toISOString(),
+    // Nace SOLICITADA sin importar si vino un tutor preferido, tal como el
+    // backend real — un tutorId pre-elegido no salta la máquina de estados.
+    estado: "SOLICITADA" as SessionStatus,
     observaciones: parsed.data.observaciones ?? "",
   };
   sessions.unshift(session);
-  createAuditEvent("CREACION_SESION", {
+  createAuditEvent("SESSION_CREATED", {
     sessionId: session.id,
-    serviceId: session.servicioId,
+    servicioId: session.servicioId,
   });
   res.status(201).json(ListSessionsResponse.element.parse(session));
 });
 
-router.patch("/v1/sessions/:id/status", (req, res) => {
+router.put("/sessions/:id/status", (req, res) => {
   const params = TransitionSessionParams.safeParse(req.params);
   const body = TransitionSessionBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -415,8 +347,12 @@ router.patch("/v1/sessions/:id/status", (req, res) => {
     return;
   }
 
-  // Regla invariante Caso 5: No se puede transicionar a EN_CURSO sin tutor asignado previo
-  if (body.data.estado === "EN_CURSO" && (!session.tutorId || session.estado === "AGENDADA")) {
+  if (body.data.status === "ASIGNADA" && body.data.tutorId) {
+    session.tutorId = body.data.tutorId;
+  }
+
+  // Invariante real de ms-edututor-sessions: no se puede pasar a EN_CURSO sin tutor asignado.
+  if (body.data.status === "EN_CURSO" && !session.tutorId) {
     res.status(409).json({
       status: 409,
       error: "Conflict",
@@ -426,90 +362,70 @@ router.patch("/v1/sessions/:id/status", (req, res) => {
     return;
   }
 
-  if (!allowedTransitions[session.estado].includes(body.data.estado)) {
+  if (!allowedTransitions[session.estado].includes(body.data.status)) {
     res.status(409).json({
       status: 409,
       error: "Conflict",
-      message: `IllegalStateTransitionException: No se puede pasar del estado ${session.estado} al estado ${body.data.estado}.`,
+      message: `IllegalStateTransitionException: No se puede pasar del estado ${session.estado} al estado ${body.data.status}.`,
       path: req.originalUrl,
     });
     return;
   }
 
-  const previousStatus = session.estado;
-  session.estado = body.data.estado;
-  createAuditEvent("CAMBIO_ESTADO", {
+  const estadoAnterior = session.estado;
+  session.estado = body.data.status;
+  createAuditEvent("SESSION_STATE_CHANGED", {
     sessionId: session.id,
-    from: previousStatus,
-    to: session.estado,
+    estadoAnterior,
+    estadoNuevo: session.estado,
+    tutorId: session.tutorId ?? "",
   });
   res.json(ListSessionsResponse.element.parse(session));
 });
 
 // ============================================================================
-// 3. REPORT CONTROLLER (/api/v1/report/... and /api/v1/analytics/...)
+// 3. REPORT CONTROLLER (/api/report/...)
 // ============================================================================
-const handleSummary = (_req: any, res: any) => {
+router.get("/report/kpis", (req, res) => {
+  const range = typeof req.query.range === "string" ? req.query.range : "last24h";
+  const creadas = hourlyMetrics.reduce((sum, item) => sum + item.creadas, 0);
+  const realizadas = hourlyMetrics.reduce((sum, item) => sum + item.realizadas, 0);
   res.json(
-    GetAnalyticsSummaryResponse.parse({
-      activeSessions: sessions.filter((s) =>
-        ["AGENDADA", "CONFIRMADA", "EN_CURSO"].includes(s.estado),
-      ).length,
-      completedSessions: 48,
-      cancelledSessions: sessions.filter((s) => s.estado === "CANCELADA").length,
-      weeklyRevenue: dailyMetrics.reduce((sum, metric) => sum + metric.ingresos, 0),
-      successRate: 94.6,
-      sessionsChange: 12.8,
-      revenueChange: 8.4,
+    GetReportKpisResponse.parse({
+      range,
+      sesionesPorHora: hourlyMetrics,
+      tasaAsistencia: creadas === 0 ? 0 : realizadas / creadas,
+      estadosActivos: {
+        SOLICITADA: sessions.filter((s) => s.estado === "SOLICITADA").length,
+        CONFIRMADA: sessions.filter((s) => s.estado === "CONFIRMADA").length,
+        ASIGNADA: sessions.filter((s) => s.estado === "ASIGNADA").length,
+        EN_CURSO: sessions.filter((s) => s.estado === "EN_CURSO").length,
+        REALIZADA: sessions.filter((s) => s.estado === "REALIZADA").length,
+        CANCELADA: sessions.filter((s) => s.estado === "CANCELADA").length,
+      },
     }),
   );
-};
+});
 
-const handleHourly = (_req: any, res: any) => {
-  res.json(GetHourlyMetricsResponse.parse(hourlyMetrics));
-};
-
-const handleDaily = (_req: any, res: any) => {
-  res.json(GetDailyMetricsResponse.parse(dailyMetrics));
-};
-
-router.get("/v1/report/summary", handleSummary);
-router.get("/v1/analytics/summary", handleSummary);
-
-router.get("/v1/report/hourly", handleHourly);
-router.get("/v1/analytics/hourly", handleHourly);
-
-router.get("/v1/report/daily", handleDaily);
-router.get("/v1/analytics/daily", handleDaily);
-
-router.get("/v1/report/kpis", (_req, res) => {
-  res.json([
-    { estado: "FINALIZADA", porcentaje: 66, total: 114 },
-    { estado: "EN_CURSO", porcentaje: 13, total: 22 },
-    { estado: "AGENDADA", porcentaje: 13, total: 23 },
-    { estado: "CANCELADA", porcentaje: 8, total: 14 },
-  ]);
+router.get("/report/top-services", (_req, res) => {
+  res.json(GetTopServicesResponse.parse(topServices));
 });
 
 // ============================================================================
-// 4. AUDIT CONTROLLER (/api/v1/audit/... and /api/v1/audit-events)
+// 4. AUDIT CONTROLLER (/api/audit/timeline)
 // ============================================================================
-const handleAuditEvents = (req: any, res: any) => {
+router.get("/audit/timeline", (req, res) => {
   const parsed = ListAuditEventsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Parámetros de auditoría inválidos." });
     return;
   }
 
-  const { eventType, limit } = parsed.data;
-  const filtered = auditEvents
-    .filter((event) => !eventType || event.eventoTipo === eventType)
-    .slice(0, limit ?? 50);
+  const { usuario, tipo } = parsed.data;
+  const filtered = auditEvents.filter(
+    (event) => (!tipo || event.eventoTipo === tipo) && (!usuario || event.usuario === usuario),
+  );
   res.json(ListAuditEventsResponse.parse(filtered));
-};
-
-router.get("/v1/audit/events", handleAuditEvents);
-router.get("/v1/audit/timeline", handleAuditEvents);
-router.get("/v1/audit-events", handleAuditEvents);
+});
 
 export default router;

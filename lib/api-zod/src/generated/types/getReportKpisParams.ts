@@ -6,4 +6,6 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type EventoAuditoriaPayloadJson = { [key: string]: unknown };
+export type GetReportKpisParams = {
+range?: string;
+};

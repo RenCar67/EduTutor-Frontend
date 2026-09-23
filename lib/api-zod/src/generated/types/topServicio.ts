@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type EventoAuditoriaPayloadJson = { [key: string]: unknown };
+export interface TopServicio {
+  servicioId: string;
+  totalSolicitudes: number;
+}

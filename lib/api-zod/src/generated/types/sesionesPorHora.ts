@@ -6,4 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type EventoAuditoriaPayloadJson = { [key: string]: unknown };
+export interface SesionesPorHora {
+  hora: Date;
+  creadas: number;
+  realizadas: number;
+  canceladas: number;
+}

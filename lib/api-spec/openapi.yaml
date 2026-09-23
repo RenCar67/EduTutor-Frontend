@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
-  description: BFF contract for the EduTutor educational tutoring platform (ms-edututor-bff)
+  version: 0.2.0
+  description: BFF contract for the EduTutor educational tutoring platform (ms-edututor-bff), aligned to the real Spring Boot microservices.
 servers:
   - url: /api
     description: Base API path for ms-edututor-bff
@@ -33,29 +33,13 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 
   # ==========================================================================
-  # 1. CATALOG CONTROLLER (/api/v1/catalog/...)
+  # 1. CATALOG CONTROLLER (/api/catalog/...)
   # ==========================================================================
-  /v1/catalog/services:
+  /catalog/services:
     get:
       operationId: listServices
       tags: [catalog]
       summary: List tutoring services
-      parameters:
-        - name: search
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: category
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: maxPrice
-          in: query
-          required: false
-          schema:
-            type: number
       responses:
         "200":
           description: Available services
@@ -67,9 +51,9 @@ paths:
                   $ref: "#/components/schemas/Servicio"
 
   # ==========================================================================
-  # 2. SESSIONS CONTROLLER (/api/v1/sessions/...)
+  # 2. SESSIONS CONTROLLER (/api/sessions/...)
   # ==========================================================================
-  /v1/sessions:
+  /sessions:
     get:
       operationId: listSessions
       tags: [sessions]
@@ -80,11 +64,6 @@ paths:
           required: false
           schema:
             $ref: "#/components/schemas/EstadoSesion"
-        - name: studentId
-          in: query
-          required: false
-          schema:
-            type: string
       responses:
         "200":
           description: Sessions
@@ -97,7 +76,7 @@ paths:
     post:
       operationId: createSession
       tags: [sessions]
-      summary: Schedule a tutoring session
+      summary: Request a tutoring session (born in SOLICITADA)
       requestBody:
         required: true
         content:
@@ -112,11 +91,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Sesion"
 
-  /v1/sessions/{id}/status:
-    patch:
+  /sessions/{id}/status:
+    put:
       operationId: transitionSession
       tags: [sessions]
-      summary: Transition a session status in state machine
+      summary: Transition a session status in the state machine
       parameters:
         - name: id
           in: path
@@ -150,87 +129,69 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
   # ==========================================================================
-  # 3. REPORT CONTROLLER (/api/v1/report/...)
+  # 3. REPORT CONTROLLER (/api/report/...)
   # ==========================================================================
-  /v1/report/summary:
-    get:
-      operationId: getAnalyticsSummary
-      tags: [report]
-      summary: Get dashboard KPI summary
-      responses:
-        "200":
-          description: Summary metrics
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AnalyticsSummary"
-
-  /v1/report/hourly:
-    get:
-      operationId: getHourlyMetrics
-      tags: [report]
-      summary: Get demand by hour
-      responses:
-        "200":
-          description: Hourly demand
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/MetricaHora"
-
-  /v1/report/daily:
-    get:
-      operationId: getDailyMetrics
-      tags: [report]
-      summary: Get daily service metrics
-      responses:
-        "200":
-          description: Daily metrics
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/MetricaServicioDia"
-
-  /v1/report/kpis:
+  /report/kpis:
     get:
       operationId: getReportKpis
       tags: [report]
-      summary: Get program gauges and state distribution
+      summary: Get session throughput by hour, attendance rate and active-state gauges
+      parameters:
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            default: last24h
       responses:
         "200":
-          description: State distribution gauges
+          description: KPI snapshot for the given range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportKpis"
+
+  /report/top-services:
+    get:
+      operationId: getTopServices
+      tags: [report]
+      summary: Get most-requested services for the given range
+      parameters:
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            default: last7d
+      responses:
+        "200":
+          description: Top services by request count
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/EstadoGauge"
+                  $ref: "#/components/schemas/TopServicio"
 
   # ==========================================================================
-  # 4. AUDIT CONTROLLER (/api/v1/audit/...)
+  # 4. AUDIT CONTROLLER (/api/audit/...)
   # ==========================================================================
-  /v1/audit/events:
+  /audit/timeline:
     get:
       operationId: listAuditEvents
       tags: [audit]
       summary: List audit trail events
       parameters:
-        - name: eventType
+        - name: usuario
           in: query
           required: false
           schema:
             type: string
-        - name: limit
+        - name: tipo
           in: query
           required: false
           schema:
-            type: integer
-            minimum: 1
-            maximum: 100
+            type: string
       responses:
         "200":
           description: Audit events
@@ -252,20 +213,16 @@ components:
         - status
     EstadoSesion:
       type: string
-      enum: [AGENDADA, CONFIRMADA, EN_CURSO, FINALIZADA, CANCELADA]
-    EstadoGauge:
-      type: object
-      required: [estado, porcentaje, total]
-      properties:
-        estado:
-          $ref: "#/components/schemas/EstadoSesion"
-        porcentaje:
-          type: number
-        total:
-          type: integer
+      description: >
+        SOLICITADA -> CONFIRMADA -> ASIGNADA -> EN_CURSO -> REALIZADA, o
+        CANCELADA desde cualquier estado previo a EN_CURSO.
+      enum: [SOLICITADA, CONFIRMADA, ASIGNADA, EN_CURSO, REALIZADA, CANCELADA]
+    EstadoServicio:
+      type: string
+      enum: [ACTIVO, INACTIVO]
     Servicio:
       type: object
-      required: [id, nombre, descripcion, categoria, tutorNombre, precioHora, duracionMinutos, estado]
+      required: [id, nombre, descripcion, categoria, tutorNombre, precioHora, duracionMinutos, estado, cupoTotal, cupoDisponible, bloqueHorario]
       properties:
         id: { type: string }
         nombre: { type: string }
@@ -274,61 +231,71 @@ components:
         tutorNombre: { type: string }
         precioHora: { type: number }
         duracionMinutos: { type: integer }
-        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+        estado: { $ref: "#/components/schemas/EstadoServicio" }
+        cupoTotal: { type: integer, description: "Cupos totales del bloque horario" }
+        cupoDisponible: { type: integer, description: "Cupos disponibles ahora mismo" }
+        bloqueHorario: { type: string, description: "Bloque horario del servicio, ej. 'Lun-Mie 15:00-16:00'" }
     Sesion:
       type: object
-      required: [id, servicioId, estudianteId, tutorId, tutorNombre, servicioNombre, fechaHora, estado, observaciones]
+      required: [id, servicioId, estudianteId, estado]
       properties:
         id: { type: string }
         servicioId: { type: string }
         estudianteId: { type: string }
-        tutorId: { type: string }
-        tutorNombre: { type: string }
-        servicioNombre: { type: string }
-        fechaHora: { type: string, format: date-time }
+        tutorId: { type: string, nullable: true }
+        # Denormalizados: ms-edututor-sessions no conoce el catalogo ni un
+        # directorio de tutores. El backend no los envia — el frontend los
+        # resuelve contra /api/catalog/services (o muestra el tutorId crudo).
+        tutorNombre: { type: string, nullable: true }
+        servicioNombre: { type: string, nullable: true }
+        fechaHora: { type: string, format: date-time, nullable: true }
+        fechaSolicitud: { type: string, format: date-time, nullable: true }
         estado: { $ref: "#/components/schemas/EstadoSesion" }
-        observaciones: { type: string }
+        observaciones: { type: string, nullable: true }
     SesionInput:
       type: object
-      required: [servicioId, estudianteId, tutorId, fechaHora]
+      required: [servicioId, estudianteId]
       properties:
         servicioId: { type: string }
         estudianteId: { type: string }
-        tutorId: { type: string }
+        tutorId: { type: string, description: "Tutor preferido, opcional — la sesion igual nace SOLICITADA" }
         fechaHora: { type: string, format: date-time }
         observaciones: { type: string }
     SessionStatusInput:
       type: object
-      required: [estado]
+      required: [status]
       properties:
-        estado: { $ref: "#/components/schemas/EstadoSesion" }
-    AnalyticsSummary:
+        status: { $ref: "#/components/schemas/EstadoSesion" }
+        tutorId: { type: string, description: "Requerido si status=ASIGNADA" }
+    SesionesPorHora:
       type: object
-      required: [activeSessions, completedSessions, cancelledSessions, weeklyRevenue, successRate, sessionsChange, revenueChange]
+      required: [hora, creadas, realizadas, canceladas]
       properties:
-        activeSessions: { type: integer }
-        completedSessions: { type: integer }
-        cancelledSessions: { type: integer }
-        weeklyRevenue: { type: number }
-        successRate: { type: number }
-        sessionsChange: { type: number }
-        revenueChange: { type: number }
-    MetricaHora:
+        hora: { type: string, format: date-time }
+        creadas: { type: integer }
+        realizadas: { type: integer }
+        canceladas: { type: integer }
+    ReportKpis:
       type: object
-      required: [hora, totalSesiones, tasaExito]
+      required: [range, sesionesPorHora, tasaAsistencia, estadosActivos]
       properties:
-        hora: { type: string }
-        totalSesiones: { type: integer }
-        tasaExito: { type: number }
-    MetricaServicioDia:
+        range: { type: string }
+        sesionesPorHora:
+          type: array
+          items:
+            $ref: "#/components/schemas/SesionesPorHora"
+        tasaAsistencia: { type: number, description: "realizadas / creadas, 0..1" }
+        estadosActivos:
+          type: object
+          additionalProperties:
+            type: integer
+          description: "Conteo actual de sesiones por estado (gauge)"
+    TopServicio:
       type: object
-      required: [fecha, servicioId, servicioNombre, ingresos, sesionesTotales]
+      required: [servicioId, totalSolicitudes]
       properties:
-        fecha: { type: string, format: date }
         servicioId: { type: string }
-        servicioNombre: { type: string }
-        ingresos: { type: number }
-        sesionesTotales: { type: integer }
+        totalSolicitudes: { type: integer }
     EventoAuditoria:
       type: object
       required: [id, eventoTipo, origen, usuario, fechaTimestamp, payloadJson, resultado]

@@ -1,8 +1,8 @@
 import { Bell, BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, ListChecks, LogOut, Menu, Search, ShieldCheck, X } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { demoAudit, demoDaily, demoHourly, demoServices, demoSessions, demoSummary, lifecycle } from '@/lib/demo-data';
-import type { AnalyticsSummary, EventoAuditoria, MetricaHora, MetricaServicioDia, Servicio, Sesion, SesionInput } from '@workspace/api-client-react';
+import { demoAudit, demoKpis, demoServices, demoSessions, demoTopServices, lifecycle } from '@/lib/demo-data';
+import type { EventoAuditoria, ReportKpis, TopServicio, Servicio, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useAuth, type AppRole } from '@/auth/auth-context';
 
 type Role = 'Estudiante' | 'Coordinador' | 'Administrador' | 'Auditor';
@@ -13,9 +13,8 @@ type WorkspaceContextValue = {
   setRole: (value: Role) => void;
   services: Servicio[];
   sessions: Sesion[];
-  summary: AnalyticsSummary;
-  hourly: MetricaHora[];
-  daily: MetricaServicioDia[];
+  kpis: ReportKpis;
+  topServices: TopServicio[];
   audit: EventoAuditoria[];
   createLocalSession: (input: SesionInput) => void;
   transitionLocalSession: (id: string, status: Sesion['estado']) => void;
@@ -54,7 +53,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       tutorNombre: service.tutorNombre,
       servicioNombre: service.nombre,
       fechaHora: input.fechaHora,
-      estado: 'AGENDADA',
+      estado: 'SOLICITADA',
       observaciones: input.observaciones ?? '',
     }, ...current]);
   };
@@ -64,8 +63,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!targetSession) {
       throw new Error(`No se encontró la sesión ${id}`);
     }
-    // Regla de invariante Caso 5: No se puede transicionar a EN_CURSO sin tutor asignado previamente
-    if (status === 'EN_CURSO' && (!targetSession.tutorId || targetSession.estado === 'AGENDADA')) {
+    // Invariante real de ms-edututor-sessions: no se puede pasar a EN_CURSO sin tutor asignado.
+    if (status === 'EN_CURSO' && !targetSession.tutorId) {
       throw new Error(
         'IllegalStateTransitionException: No se puede iniciar una sesión (EN_CURSO) sin tutor previamente asignado y confirmado.'
       );
@@ -81,8 +80,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(() => ({
-    mockMode, setMockMode, role, setRole, services, sessions, summary: demoSummary,
-    hourly: demoHourly, daily: demoDaily, audit, createLocalSession, transitionLocalSession,
+    mockMode, setMockMode, role, setRole, services, sessions, kpis: demoKpis,
+    topServices: demoTopServices, audit, createLocalSession, transitionLocalSession,
   }), [mockMode, role, services, sessions, audit, user]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

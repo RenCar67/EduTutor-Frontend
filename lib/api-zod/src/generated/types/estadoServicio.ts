@@ -6,4 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type EventoAuditoriaPayloadJson = { [key: string]: unknown };
+export type EstadoServicio = typeof EstadoServicio[keyof typeof EstadoServicio];
+
+
+export const EstadoServicio = {
+  ACTIVO: 'ACTIVO',
+  INACTIVO: 'INACTIVO',
+} as const;

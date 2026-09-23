@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type EventoAuditoriaPayloadJson = { [key: string]: unknown };
+/**
+ * Conteo actual de sesiones por estado (gauge)
+ */
+export type ReportKpisEstadosActivos = {[key: string]: number};
