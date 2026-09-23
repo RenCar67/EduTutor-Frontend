@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
-import { InteractionStatus, type AccountInfo, type IdTokenClaims } from '@azure/msal-browser';
+import { InteractionRequiredAuthError, InteractionStatus, type AccountInfo, type IdTokenClaims, type IPublicClientApplication } from '@azure/msal-browser';
 import { useMsal } from '@azure/msal-react';
 import { azureConfigured, loginRequest, tokenRequest, CANONICAL_ROLES, type CanonicalRole } from './authConfig';
 import { configureBffInterceptor } from './httpClient';
@@ -90,22 +90,52 @@ function normalizeRole(value: unknown): AppRole | null {
   return null;
 }
 
-function mapClaimsToRole(claims: IdTokenClaims | undefined): AppRole {
-  const roles = Array.isArray(claims?.roles) ? claims.roles : [];
-  return roles.map(normalizeRole).find((role): role is AppRole => Boolean(role)) ?? 'ESTUDIANTE';
+function rolesFromClaimArray(roles: unknown): AppRole | null {
+  if (!Array.isArray(roles)) return null;
+  return roles.map(normalizeRole).find((role): role is AppRole => Boolean(role)) ?? null;
 }
 
-function accountToUser(account: AccountInfo): AppUser {
+// El App Role del usuario se asigna sobre el registro de la API (EduTutor-API),
+// no sobre la SPA — por eso solo aparece en el claim "roles" del access token
+// pedido para ese scope, nunca en el ID token (cuya audiencia es la propia SPA).
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join(''),
+    );
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function accountToUser(instance: IPublicClientApplication, account: AccountInfo): Promise<AppUser> {
   const claims = account.idTokenClaims as (IdTokenClaims & Record<string, unknown>) | undefined;
   const userId = String(claims?.oid ?? claims?.sub ?? account.localAccountId);
   const name = String(claims?.name ?? account.name ?? 'Usuario institucional');
   const username = String(claims?.preferred_username ?? account.username ?? '');
 
+  let role = rolesFromClaimArray(claims?.roles);
+  if (!role) {
+    try {
+      const result = await instance.acquireTokenSilent(tokenRequest(account));
+      const apiClaims = decodeJwtPayload(result.accessToken);
+      role = rolesFromClaimArray(apiClaims?.roles);
+    } catch (error) {
+      if (!(error instanceof InteractionRequiredAuthError)) throw error;
+    }
+  }
+
   return {
     userId,
     name,
     username,
-    role: mapClaimsToRole(claims),
+    role: role ?? 'ESTUDIANTE',
     source: 'azure',
   };
 }
@@ -127,11 +157,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     void instance
       .handleRedirectPromise()
-      .then((result) => {
+      .then(async (result) => {
         if (!active) return;
         if (result?.account) {
           instance.setActiveAccount(result.account);
-          setAzureUser(accountToUser(result.account));
+          setAzureUser(await accountToUser(instance, result.account));
           setModeState('azure');
           window.localStorage.setItem(AUTH_MODE_KEY, 'azure');
         }
@@ -148,10 +178,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [instance]);
 
   useEffect(() => {
+    let active = true;
     if (account && mode === 'azure') {
-      setAzureUser(accountToUser(account));
+      void accountToUser(instance, account).then((nextUser) => {
+        if (active) setAzureUser(nextUser);
+      });
     }
-  }, [account, mode]);
+    return () => {
+      active = false;
+    };
+  }, [account, mode, instance]);
 
   const acquireAccessToken = async (): Promise<string | null> => {
     if (mode !== 'azure' || !account) return null;
