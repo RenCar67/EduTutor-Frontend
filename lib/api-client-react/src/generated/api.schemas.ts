@@ -49,6 +49,17 @@ export interface Servicio {
   bloqueHorario: string;
 }
 
+export interface ServicioInput {
+  asignatura: string;
+  tutor: string;
+  bloqueHorario: string;
+  cupoTotal: number;
+  descripcion?: string;
+  categoria?: string;
+  precioHora?: number;
+  duracionMinutos?: number;
+}
+
 export interface Sesion {
   id: string;
   servicioId: string;

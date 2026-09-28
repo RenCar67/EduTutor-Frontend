@@ -2,7 +2,7 @@ import { Bell, BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, List
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { demoAudit, demoKpis, demoServices, demoSessions, demoTopServices, lifecycle } from '@/lib/demo-data';
-import type { EventoAuditoria, ReportKpis, TopServicio, Servicio, Sesion, SesionInput } from '@workspace/api-client-react';
+import type { EventoAuditoria, ReportKpis, TopServicio, Servicio, ServicioInput, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useAuth, type AppRole } from '@/auth/auth-context';
 
 type Role = 'Estudiante' | 'Coordinador' | 'Administrador' | 'Auditor';
@@ -16,6 +16,7 @@ type WorkspaceContextValue = {
   kpis: ReportKpis;
   topServices: TopServicio[];
   audit: EventoAuditoria[];
+  createLocalService: (input: ServicioInput) => void;
   createLocalSession: (input: SesionInput) => void;
   transitionLocalSession: (id: string, status: Sesion['estado']) => void;
 };
@@ -27,7 +28,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const mockMode = mode === 'mock';
   const setMockMode = (value: boolean) => setMode(value ? 'mock' : 'azure');
   const [role, setRole] = useState<Role>('Administrador');
-  const [services] = useState(demoServices);
+  const [services, setServices] = useState(demoServices);
   const [sessions, setSessions] = useState(demoSessions);
   const [audit] = useState(demoAudit);
 
@@ -42,6 +43,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setRole(roleLabels[user.role]);
     }
   }, [user]);
+
+  const createLocalService = (input: ServicioInput) => {
+    setServices((current) => [{
+      id: `svc-local-${current.length + 1}`,
+      nombre: input.asignatura,
+      tutorNombre: input.tutor,
+      bloqueHorario: input.bloqueHorario,
+      cupoTotal: input.cupoTotal,
+      cupoDisponible: input.cupoTotal,
+      descripcion: input.descripcion ?? '',
+      categoria: input.categoria ?? 'General',
+      precioHora: input.precioHora ?? 0,
+      duracionMinutos: input.duracionMinutos ?? 60,
+      estado: 'ACTIVO',
+    }, ...current]);
+  };
 
   const createLocalSession = (input: SesionInput) => {
     const service = services.find((item) => item.id === input.servicioId) ?? services[0];
@@ -81,7 +98,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     mockMode, setMockMode, role, setRole, services, sessions, kpis: demoKpis,
-    topServices: demoTopServices, audit, createLocalSession, transitionLocalSession,
+    topServices: demoTopServices, audit, createLocalService, createLocalSession, transitionLocalSession,
   }), [mockMode, role, services, sessions, audit, user]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

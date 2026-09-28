@@ -8,6 +8,7 @@ import {
   getListAuditEventsQueryKey,
   getListServicesQueryKey,
   getListSessionsQueryKey,
+  useCreateService,
   useCreateSession,
   useGetReportKpis,
   useGetTopServices,
@@ -16,7 +17,7 @@ import {
   useListSessions,
   useTransitionSession,
 } from '@workspace/api-client-react';
-import type { EstadoSesion, Servicio, Sesion, SesionInput } from '@workspace/api-client-react';
+import type { EstadoSesion, Servicio, ServicioInput, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useWorkspace, lifecycle } from '@/components/app-shell';
 import { useToast } from '@/hooks/use-toast';
 import { ActionButton, ArrowLink, EmptyState, ErrorState, MetricCard, SectionHeading, SelectField, SkeletonRows, StatusPill } from '@/components/ui';
@@ -123,15 +124,17 @@ function ModuleCard({ href, icon, number, title, detail }: { href: string; icon:
 }
 
 export function CatalogPage() {
-  const { mockMode, services: localServices, createLocalSession } = useWorkspace();
+  const { mockMode, role, services: localServices, createLocalService, createLocalSession } = useWorkspace();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateSession();
+  const createServiceMutation = useCreateService();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showCreateService, setShowCreateService] = useState(false);
   const servicesQuery = useListServices({ query: { enabled: !mockMode, queryKey: getListServicesQueryKey() } });
   const services = (mockMode ? localServices : (Array.isArray(servicesQuery.data) ? servicesQuery.data : [])).filter((service) => service.estado === 'ACTIVO' && (!search || `${service.nombre} ${service.descripcion}`.toLowerCase().includes(search.toLowerCase())) && (!category || service.categoria === category) && (!maxPrice || service.precioHora <= Number(maxPrice)));
   const categories = [...new Set(localServices.map((service) => service.categoria))];
@@ -168,12 +171,45 @@ export function CatalogPage() {
       },
     });
   };
+  const createService = (input: ServicioInput) => {
+    if (mockMode) {
+      createLocalService(input);
+      setShowCreateService(false);
+      toast({ title: 'Servicio creado localmente', description: 'Se agregó al workspace de demostración.' });
+      return;
+    }
+    createServiceMutation.mutate({ data: input }, {
+      onSuccess: () => {
+        setShowCreateService(false);
+        toast({ title: 'Servicio creado', description: 'El servicio ya está disponible en el catálogo.' });
+        void queryClient.invalidateQueries({ queryKey: getListServicesQueryKey() });
+      },
+      onError: (error: any) => {
+        const errorDetail = error?.data?.error || error?.data?.message || error?.message || 'No se pudo crear el servicio.';
+        toast({ title: 'Error al crear servicio', description: errorDetail, variant: 'destructive' });
+      },
+    });
+  };
   return <div className="space-y-7">
-    <PageIntro eyebrow="Descubrir · Catálogo" title="El acompañamiento correcto, sin fricción." detail="Explora servicios activos por disciplina, precio y tutor. Cuando encuentres el encaje, deja la sesión encaminada desde aquí." action={<Link href="/sessions" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-bold transition hover:border-primary/40 hover:text-primary" data-testid="link-catalog-sessions"><CalendarClock size={15} /> Ver sesiones</Link>} />
+    <PageIntro eyebrow="Descubrir · Catálogo" title="El acompañamiento correcto, sin fricción." detail="Explora servicios activos por disciplina, precio y tutor. Cuando encuentres el encaje, deja la sesión encaminada desde aquí." action={<div className="flex items-center gap-2">{role === 'Administrador' && <ActionButton onClick={() => setShowCreateService(true)} testId="button-new-service"><Plus size={15} /> Nuevo servicio</ActionButton>}<Link href="/sessions" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-bold transition hover:border-primary/40 hover:text-primary" data-testid="link-catalog-sessions"><CalendarClock size={15} /> Ver sesiones</Link></div>} />
     <div className="rounded-2xl border border-card-border bg-card p-4 shadow-[0_8px_26px_hsl(var(--foreground)/.025)] md:p-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><label className="block flex-1"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Buscar servicio o tutor</span><div className="relative"><Search size={16} className="absolute left-3 top-3 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ej. cálculo, conversación..." className="w-full rounded-xl border border-input bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/65 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-catalog-search" /></div></label><div className="flex gap-2"><button onClick={() => setShowFilters(!showFilters)} className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-bold transition ${showFilters ? 'border-primary/40 bg-[hsl(var(--primary)/.06)] text-primary' : 'border-border bg-background hover:border-primary/40'}`} data-testid="button-catalog-filters"><Filter size={14} /> Filtros <ChevronDown size={13} className={showFilters ? 'rotate-180 transition' : 'transition'} /></button><button onClick={() => { setSearch(''); setCategory(''); setMaxPrice(''); }} className="rounded-xl px-3 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted" data-testid="button-clear-filters">Limpiar</button></div></div>{showFilters && <div className="mt-4 grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-2"><SelectField label="Categoría" value={category} onChange={setCategory} options={categories.map((item) => ({ label: item, value: item }))} testId="select-catalog-category" /><label><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Precio máximo / hora</span><input type="number" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} placeholder="Sin límite" className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-catalog-price" /></label></div>}</div>
     {!mockMode && servicesQuery.isLoading ? <SkeletonRows count={5} /> : !mockMode && servicesQuery.isError ? <ErrorState onRetry={() => void servicesQuery.refetch()} /> : services.length === 0 ? <EmptyState title="No encontramos ese encaje" detail="Prueba con otra disciplina o amplía el precio máximo por hora." /> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{services.map((service, index) => <ServiceCard key={service.id} service={service} index={index} onSchedule={() => setSelected(service.id)} />)}</div>}
     {selected && <ScheduleDialog service={services.find((service) => service.id === selected) ?? localServices.find((service) => service.id === selected)!} onClose={() => setSelected(null)} onCreate={create} pending={createMutation.isPending} />}
+    {showCreateService && <CreateServiceDialog onClose={() => setShowCreateService(false)} onCreate={createService} pending={createServiceMutation.isPending} />}
   </div>;
+}
+
+function CreateServiceDialog({ onClose, onCreate, pending }: { onClose: () => void; onCreate: (input: ServicioInput) => void; pending: boolean }) {
+  const [asignatura, setAsignatura] = useState('');
+  const [tutor, setTutor] = useState('');
+  const [bloqueHorario, setBloqueHorario] = useState('');
+  const [cupoTotal, setCupoTotal] = useState('10');
+  const [descripcion, setDescripcion] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [precioHora, setPrecioHora] = useState('');
+  const [duracionMinutos, setDuracionMinutos] = useState('60');
+  const valido = asignatura.trim() && tutor.trim() && bloqueHorario.trim() && Number(cupoTotal) > 0;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[hsl(var(--foreground)/.35)] p-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-2xl border border-card-border bg-card p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-primary">Administración</p><h3 className="mt-1 font-display text-xl font-bold">Nuevo servicio</h3></div><button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" data-testid="button-close-create-service"><X size={17} /></button></div><div className="mt-6 max-h-[60vh] space-y-4 overflow-y-auto pr-1"><label className="block"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Asignatura</span><input value={asignatura} onChange={(event) => setAsignatura(event.target.value)} placeholder="Ej. Cálculo diferencial" className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-asignatura" /></label><label className="block"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Tutor</span><input value={tutor} onChange={(event) => setTutor(event.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-tutor" /></label><div className="grid grid-cols-2 gap-3"><label><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Bloque horario</span><input value={bloqueHorario} onChange={(event) => setBloqueHorario(event.target.value)} placeholder="Lun-Mié 15:00-16:00" className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-bloque" /></label><label><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Cupo total</span><input type="number" min="1" value={cupoTotal} onChange={(event) => setCupoTotal(event.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-cupo" /></label></div><label className="block"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Descripción</span><textarea value={descripcion} onChange={(event) => setDescripcion(event.target.value)} rows={2} className="w-full resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-descripcion" /></label><div className="grid grid-cols-2 gap-3"><label><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Categoría</span><input value={categoria} onChange={(event) => setCategoria(event.target.value)} placeholder="Matemáticas" className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-categoria" /></label><label><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Precio / hora</span><input type="number" min="0" value={precioHora} onChange={(event) => setPrecioHora(event.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-precio" /></label></div><label className="block"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">Duración (min)</span><input type="number" min="1" value={duracionMinutos} onChange={(event) => setDuracionMinutos(event.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" data-testid="input-service-duracion" /></label></div><div className="mt-6 flex justify-end gap-2"><ActionButton variant="quiet" onClick={onClose} testId="button-cancel-create-service">Cancelar</ActionButton><ActionButton disabled={!valido || pending} onClick={() => onCreate({ asignatura, tutor, bloqueHorario, cupoTotal: Number(cupoTotal), descripcion: descripcion || undefined, categoria: categoria || undefined, precioHora: precioHora ? Number(precioHora) : undefined, duracionMinutos: duracionMinutos ? Number(duracionMinutos) : undefined })} testId="button-submit-create-service">{pending ? 'Guardando...' : 'Crear servicio'} <CheckCircle2 size={14} /></ActionButton></div></div></div>;
 }
 
 function ServiceCard({ service, index, onSchedule }: { service: import('@workspace/api-client-react').Servicio; index: number; onSchedule: () => void }) {

@@ -49,6 +49,23 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Servicio"
+    post:
+      operationId: createService
+      tags: [catalog]
+      summary: Create a new catalog service (ADMIN only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServicioInput"
+      responses:
+        "201":
+          description: Created service
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Servicio"
 
   # ==========================================================================
   # 2. SESSIONS CONTROLLER (/api/sessions/...)
@@ -235,6 +252,21 @@ components:
         cupoTotal: { type: integer, description: "Cupos totales del bloque horario" }
         cupoDisponible: { type: integer, description: "Cupos disponibles ahora mismo" }
         bloqueHorario: { type: string, description: "Bloque horario del servicio, ej. 'Lun-Mie 15:00-16:00'" }
+    # Nombres reales del backend (asignatura/tutor) — a diferencia de Servicio
+    # (la respuesta), la creación llega tal cual al ServicioController real,
+    # sin pasar por el DTO que renombra a nombre/tutorNombre.
+    ServicioInput:
+      type: object
+      required: [asignatura, tutor, bloqueHorario, cupoTotal]
+      properties:
+        asignatura: { type: string }
+        tutor: { type: string }
+        bloqueHorario: { type: string }
+        cupoTotal: { type: integer }
+        descripcion: { type: string }
+        categoria: { type: string }
+        precioHora: { type: number }
+        duracionMinutos: { type: integer }
     Sesion:
       type: object
       required: [id, servicioId, estudianteId, estado]

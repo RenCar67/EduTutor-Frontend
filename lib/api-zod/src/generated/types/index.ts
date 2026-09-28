@@ -20,6 +20,7 @@ export * from './listSessionsParams';
 export * from './reportKpis';
 export * from './reportKpisEstadosActivos';
 export * from './servicio';
+export * from './servicioInput';
 export * from './sesion';
 export * from './sesionesPorHora';
 export * from './sesionInput';

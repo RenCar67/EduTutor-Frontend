@@ -29,6 +29,7 @@ import type {
   ListSessionsParams,
   ReportKpis,
   Servicio,
+  ServicioInput,
   Sesion,
   SesionInput,
   SessionStatusInput,
@@ -216,6 +217,94 @@ export function useListServices<TData = Awaited<ReturnType<typeof listServices>>
 
 
 
+
+export const getCreateServiceUrl = () => {
+
+
+
+
+  return `/api/catalog/services`
+}
+
+/**
+ * @summary Create a new catalog service (ADMIN only)
+ */
+export const createService = async (servicioInput: ServicioInput, options?: Parameters<typeof customFetch>[1]): Promise<Servicio> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Servicio>(getCreateServiceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(servicioInput)
+  }
+);}
+
+
+
+
+
+export const getCreateServiceMutationKey = () => ['createService'] as const;
+
+export const getCreateServiceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,CreateServiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,CreateServiceMutationVariables, TContext> => {
+
+const mutationKey = getCreateServiceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createService>>, CreateServiceMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createService(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateServiceMutationResult = NonNullable<Awaited<ReturnType<typeof createService>>>
+    export type CreateServiceMutationBody = BodyType<ServicioInput>
+    export type CreateServiceMutationError = ErrorType<unknown>
+    export type CreateServiceMutationVariables = {data: BodyType<ServicioInput>}
+
+    /**
+ * @summary Create a new catalog service (ADMIN only)
+ */
+export const useCreateService = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,CreateServiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createService>>,
+        TError,
+        CreateServiceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateServiceMutationOptions(options));
+    }
 
 export const getListSessionsUrl = (params?: ListSessionsParams,) => {
   const normalizedParams = new URLSearchParams();

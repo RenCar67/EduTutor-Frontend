@@ -37,6 +37,35 @@ export const ListServicesResponse = zod.array(ListServicesResponseItem)
 
 
 /**
+ * @summary Create a new catalog service (ADMIN only)
+ */
+export const CreateServiceBody = zod.object({
+  "asignatura": zod.string(),
+  "tutor": zod.string(),
+  "bloqueHorario": zod.string(),
+  "cupoTotal": zod.number().int(),
+  "descripcion": zod.string().optional(),
+  "categoria": zod.string().optional(),
+  "precioHora": zod.number().optional(),
+  "duracionMinutos": zod.number().int().optional()
+})
+
+export const CreateServiceResponse = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string(),
+  "descripcion": zod.string(),
+  "categoria": zod.string(),
+  "tutorNombre": zod.string(),
+  "precioHora": zod.number(),
+  "duracionMinutos": zod.number().int(),
+  "estado": zod.enum(['ACTIVO', 'INACTIVO']),
+  "cupoTotal": zod.number().int().describe('Cupos totales del bloque horario'),
+  "cupoDisponible": zod.number().int().describe('Cupos disponibles ahora mismo'),
+  "bloqueHorario": zod.string().describe('Bloque horario del servicio, ej. \'Lun-Mie 15:00-16:00\'')
+})
+
+
+/**
  * @summary List tutoring sessions
  */
 export const ListSessionsQueryParams = zod.object({
