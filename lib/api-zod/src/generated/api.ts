@@ -196,3 +196,22 @@ export const ListAuditEventsResponseItem = zod.object({
 export const ListAuditEventsResponse = zod.array(ListAuditEventsResponseItem)
 
 
+/**
+ * @summary Full audit history of one session, oldest first
+ */
+export const ListAuditEventsBySessionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListAuditEventsBySessionResponseItem = zod.object({
+  "id": zod.string(),
+  "eventoTipo": zod.string(),
+  "origen": zod.string(),
+  "usuario": zod.string(),
+  "fechaTimestamp": zod.coerce.date(),
+  "payloadJson": zod.record(zod.string(), zod.unknown()),
+  "resultado": zod.enum(['EXITOSO', 'ERROR'])
+})
+export const ListAuditEventsBySessionResponse = zod.array(ListAuditEventsBySessionResponseItem)
+
+

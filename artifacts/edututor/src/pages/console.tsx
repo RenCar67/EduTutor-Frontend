@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetReportKpisQueryKey,
   getGetTopServicesQueryKey,
+  getListAuditEventsBySessionQueryKey,
   getListAuditEventsQueryKey,
   getListServicesQueryKey,
   getListSessionsQueryKey,
@@ -13,6 +14,7 @@ import {
   useGetReportKpis,
   useGetTopServices,
   useListAuditEvents,
+  useListAuditEventsBySession,
   useListServices,
   useListSessions,
   useTransitionSession,
@@ -20,7 +22,7 @@ import {
 import type { EstadoSesion, Servicio, ServicioInput, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useWorkspace, lifecycle } from '@/components/app-shell';
 import { useToast } from '@/hooks/use-toast';
-import { ActionButton, ArrowLink, EmptyState, ErrorState, MetricCard, SectionHeading, SelectField, SkeletonRows, StatusPill } from '@/components/ui';
+import { ActionButton, ArrowLink, EmptyState, ErrorState, MetricCard, SectionHeading, SelectField, SkeletonRows, StatusPill, TextField } from '@/components/ui';
 
 const statusLabels: Record<string, string> = { SOLICITADA: 'Solicitadas', CONFIRMADA: 'Confirmadas', ASIGNADA: 'Asignadas', EN_CURSO: 'En curso', REALIZADA: 'Realizadas', CANCELADA: 'Canceladas' };
 
@@ -408,16 +410,21 @@ export function AuditPage() {
   const [eventType, setEventType] = useState('');
   const [limit, setLimit] = useState('50');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [userFilter, setUserFilter] = useState('');
+  const [sessionId, setSessionId] = useState('');
   const params = useMemo(() => ({ tipo: eventType || undefined }), [eventType]);
-  const auditQuery = useListAuditEvents(params, { query: { enabled: !mockMode, queryKey: getListAuditEventsQueryKey(params) } });
-  const events = (mockMode ? localAudit : (Array.isArray(auditQuery.data) ? auditQuery.data : [])).filter((event) => !eventType || event.eventoTipo === eventType).slice(0, Number(limit));
-  const seenEvents = mockMode ? localAudit : (Array.isArray(auditQuery.data) ? auditQuery.data : []);
+  const timelineQuery = useListAuditEvents(params, { query: { enabled: !mockMode && !sessionId, queryKey: getListAuditEventsQueryKey(params) } });
+  const sessionQuery = useListAuditEventsBySession(sessionId, { query: { enabled: !mockMode && !!sessionId, queryKey: getListAuditEventsBySessionQueryKey(sessionId) } });
+  const auditQuery = sessionId ? sessionQuery : timelineQuery;
+  const seenEvents = mockMode ? localAudit.filter((event) => !sessionId || String(event.payloadJson?.sessionId ?? '') === sessionId) : (Array.isArray(auditQuery.data) ? auditQuery.data : []);
+  const normalizedUser = userFilter.trim().toLowerCase();
+  const events = seenEvents.filter((event) => (!eventType || event.eventoTipo === eventType) && (!normalizedUser || event.usuario.toLowerCase().includes(normalizedUser))).slice(0, Number(limit));
   const types = [...new Set([...Object.keys(EVENT_LABELS), ...seenEvents.map((event) => event.eventoTipo)])];
   return <div className="space-y-7">
     <PageIntro eyebrow="Control · Auditoría" title="Todo cambio deja una señal." detail="Consulta la historia operativa del workspace con contexto suficiente para investigar, entender y actuar." action={<div className="flex items-center gap-2 rounded-xl bg-[hsl(var(--primary)/.1)] px-3 py-2.5 text-[11px] font-semibold text-primary"><ShieldCheckIcon /> Registro íntegro</div>} />
-    <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 md:flex-row md:items-end"><SelectField label="Tipo de evento" value={eventType} onChange={setEventType} options={types.map((type) => ({ value: type, label: eventLabel(type) }))} testId="select-audit-event" /><SelectField label="Registros" value={limit} onChange={setLimit} options={['25', '50', '100'].map((value) => ({ value, label: value }))} testId="select-audit-limit" /><button onClick={() => { setEventType(''); setLimit('50'); }} className="mb-0.5 rounded-xl px-3 py-2.5 text-xs font-bold text-muted-foreground hover:bg-muted" data-testid="button-clear-audit">Limpiar filtros</button></div>
+    <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 md:flex-row md:items-end"><SelectField label="Tipo de evento" value={eventType} onChange={setEventType} options={types.map((type) => ({ value: type, label: eventLabel(type) }))} testId="select-audit-event" /><TextField label="Usuario" value={userFilter} onChange={setUserFilter} placeholder="Ej. STU-204" testId="input-audit-user" /><TextField label="N.º de sesión" value={sessionId} onChange={(value) => setSessionId(value.replace(/\D/g, ''))} placeholder="Ej. 12" inputMode="numeric" testId="input-audit-session" /><SelectField label="Registros" value={limit} onChange={setLimit} options={['25', '50', '100'].map((value) => ({ value, label: value }))} testId="select-audit-limit" /><button onClick={() => { setEventType(''); setLimit('50'); setUserFilter(''); setSessionId(''); }} className="mb-0.5 rounded-xl px-3 py-2.5 text-xs font-bold text-muted-foreground hover:bg-muted" data-testid="button-clear-audit">Limpiar filtros</button></div>
     {!mockMode && auditQuery.isLoading ? <SkeletonRows count={5} /> : !mockMode && auditQuery.isError ? <ErrorState onRetry={() => void auditQuery.refetch()} /> : events.length === 0 ? <EmptyState title="No hay eventos para mostrar" detail="Cambia los filtros para ampliar la ventana de auditoría." /> : <div className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-[0_8px_26px_hsl(var(--foreground)/.025)]"><div className="hidden grid-cols-[1fr_1.8fr_1fr_1.2fr_1fr_.4fr] gap-3 border-b border-border/70 bg-muted/40 px-5 py-3 font-mono-ui text-[9px] uppercase tracking-[.13em] text-muted-foreground md:grid"><span>Evento</span><span>Origen</span><span>Usuario</span><span>Fecha</span><span>Resultado</span><span /></div>{events.map((event) => <div key={event.id} className="border-b border-border/60 last:border-b-0"><div className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_1.8fr_1fr_1.2fr_1fr_.4fr] md:items-center"><div><p className="text-xs font-bold">{eventLabel(event.eventoTipo)}</p>{eventSummary(event) && <p className="mt-1 text-[11px] text-muted-foreground">{eventSummary(event)}</p>}</div><p className="text-xs text-muted-foreground">{originLabel(event.origen)}</p><p className="text-xs">{event.usuario}</p><p className="text-xs text-muted-foreground">{dateTime(event.fechaTimestamp)}</p><StatusPill status={event.resultado} /><button onClick={() => setExpanded(expanded === event.id ? null : event.id)} className="flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted" data-testid={`button-expand-audit-${event.id}`}><ChevronDown size={15} className={expanded === event.id ? 'rotate-180 transition' : 'transition'} /></button></div>{expanded === event.id && <div className="mx-5 mb-4 rounded-xl bg-muted/60 p-4"><dl className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">{Object.entries(event.payloadJson ?? {}).filter(([, value]) => value !== null && value !== '').map(([key, value]) => <div key={key} className="flex gap-2"><dt className="text-muted-foreground">{PAYLOAD_LABELS[key] ?? humanize(key)}:</dt><dd className="font-semibold">{payloadValue(key, value)}</dd></div>)}</dl></div>}</div>)}</div>}
-    <p className="font-mono-ui text-[10px] uppercase tracking-[.13em] text-muted-foreground">Mostrando {events.length} {events.length === 1 ? 'evento' : 'eventos'}</p>
+    <p className="font-mono-ui text-[10px] uppercase tracking-[.13em] text-muted-foreground">{sessionId ? `Historial de la sesión ${sessionId} · ` : ''}Mostrando {events.length} {events.length === 1 ? 'evento' : 'eventos'}</p>
   </div>;
 }
 

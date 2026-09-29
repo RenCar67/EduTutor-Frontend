@@ -37,6 +37,10 @@ export function ArrowLink({ children }: { children: ReactNode }) {
   return <span className="inline-flex items-center gap-1 text-xs font-bold text-primary transition group-hover:gap-2">{children}<ArrowRight size={14} /></span>;
 }
 
+export function TextField({ label, value, onChange, placeholder, testId, inputMode }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; testId: string; inputMode?: 'text' | 'numeric' }) {
+  return <label className="block"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} inputMode={inputMode} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid={testId} /></label>;
+}
+
 export function SelectField({ label, value, onChange, options, testId }: { label: string; value: string; onChange: (value: string) => void; options: { label: string; value: string }[]; testId: string }) {
   return <label className="block"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid={testId}><option value="">Todos</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }

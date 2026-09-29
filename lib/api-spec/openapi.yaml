@@ -219,6 +219,27 @@ paths:
                 items:
                   $ref: "#/components/schemas/EventoAuditoria"
 
+  /audit/session/{id}:
+    get:
+      operationId: listAuditEventsBySession
+      tags: [audit]
+      summary: Full audit history of one session, oldest first
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit events of the session
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventoAuditoria"
+
 components:
   schemas:
     HealthStatus:

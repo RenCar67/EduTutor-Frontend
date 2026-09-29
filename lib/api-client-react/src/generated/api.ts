@@ -819,3 +819,80 @@ export function useListAuditEvents<TData = Awaited<ReturnType<typeof listAuditEv
 
 
 
+export const getListAuditEventsBySessionUrl = (id: string,) => {
+
+
+
+
+  return `/api/audit/session/${id}`
+}
+
+/**
+ * @summary Full audit history of one session, oldest first
+ */
+export const listAuditEventsBySession = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<EventoAuditoria[]> => {
+
+  return customFetch<EventoAuditoria[]>(getListAuditEventsBySessionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAuditEventsBySessionQueryKey = (id: string,) => {
+    return [
+    `/api/audit/session/${id}`
+    ] as const;
+    }
+
+
+export const getListAuditEventsBySessionQueryOptions = <TData = Awaited<ReturnType<typeof listAuditEventsBySession>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAuditEventsBySession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAuditEventsBySessionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAuditEventsBySession>>> = ({ signal }) => listAuditEventsBySession(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAuditEventsBySession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAuditEventsBySessionQueryResult = NonNullable<Awaited<ReturnType<typeof listAuditEventsBySession>>>
+export type ListAuditEventsBySessionQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Full audit history of one session, oldest first
+ */
+
+export function useListAuditEventsBySession<TData = Awaited<ReturnType<typeof listAuditEventsBySession>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAuditEventsBySession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAuditEventsBySessionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
