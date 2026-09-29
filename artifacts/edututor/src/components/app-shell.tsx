@@ -1,9 +1,10 @@
-import { Bell, BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, ListChecks, LogOut, Menu, Search, ShieldCheck, X } from 'lucide-react';
+import { BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, ListChecks, LogOut, Menu, ShieldCheck, X } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { demoAudit, demoKpis, demoServices, demoSessions, demoTopServices, lifecycle } from '@/lib/demo-data';
 import type { EventoAuditoria, ReportKpis, TopServicio, Servicio, ServicioInput, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useAuth, type AppRole } from '@/auth/auth-context';
+import { NotificationsBell } from '@/components/notifications-bell';
 
 type Role = 'Estudiante' | 'Coordinador' | 'Administrador' | 'Auditor';
 type WorkspaceContextValue = {
@@ -125,7 +126,7 @@ const navItems: { href: string; label: string; icon: typeof LayoutDashboard; rol
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { mockMode, setMockMode, role, setRole } = useWorkspace();
+  const { mockMode, setMockMode, role, setRole, sessions, services, audit } = useWorkspace();
   const { user, logout, loginMock } = useAuth();
   const current = navItems.find((item) => item.href === location);
 
@@ -270,19 +271,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <ShieldCheck size={13} />
               Rol: {user?.role ?? (role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Coordinador' ? 'COORDINADOR' : role === 'Auditor' ? 'AUDITOR' : 'ADMIN')}
             </span>
-            <button
-              className="hidden rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary sm:block"
-              data-testid="button-search"
-            >
-              <Search size={17} />
-            </button>
-            <button
-              className="relative rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary"
-              data-testid="button-notifications"
-            >
-              <Bell size={17} />
-              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />
-            </button>
+            <NotificationsBell mockMode={mockMode} sessions={sessions} services={services} audit={audit} />
             <div className="ml-1 hidden h-8 w-px bg-border sm:block" />
             <label className="relative">
               <span className="sr-only">Seleccionar rol</span>
