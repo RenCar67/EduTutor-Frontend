@@ -110,12 +110,16 @@ export function useWorkspace() {
   return context;
 }
 
-const navItems = [
+// Debe coincidir con los @PreAuthorize del BFF: catálogo y sesiones son de
+// ADMIN/COORDINADOR/ESTUDIANTE; reportes y auditoría, de ADMIN/AUDITOR.
+const OPERATION_ROLES: AppRole[] = ['ADMIN', 'COORDINADOR', 'ESTUDIANTE'];
+const OVERSIGHT_ROLES: AppRole[] = ['ADMIN', 'AUDITOR'];
+const navItems: { href: string; label: string; icon: typeof LayoutDashboard; roles?: AppRole[] }[] = [
   { href: '/', label: 'Resumen', icon: LayoutDashboard },
-  { href: '/catalog', label: 'Catálogo', icon: BookOpen },
-  { href: '/sessions', label: 'Sesiones', icon: ListChecks },
-  { href: '/analytics', label: 'Analítica', icon: LineChart },
-  { href: '/audit', label: 'Auditoría', icon: ShieldCheck },
+  { href: '/catalog', label: 'Catálogo', icon: BookOpen, roles: OPERATION_ROLES },
+  { href: '/sessions', label: 'Sesiones', icon: ListChecks, roles: OPERATION_ROLES },
+  { href: '/analytics', label: 'Analítica', icon: LineChart, roles: OVERSIGHT_ROLES },
+  { href: '/audit', label: 'Auditoría', icon: ShieldCheck, roles: OVERSIGHT_ROLES },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -131,6 +135,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     Administrador: 'ADMIN',
     Auditor: 'AUDITOR',
   };
+
+  const currentRole: AppRole = user?.role ?? roleByLabel[role];
+  const visibleNav = navItems.filter((item) => !item.roles || item.roles.includes(currentRole));
 
   const initials = (user?.name ?? 'EduTutor')
     .split(' ')
@@ -150,7 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <span>
               <span className="block font-display text-[17px] font-bold tracking-tight">EduTutor</span>
-              <span className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/50">operations console</span>
+              <span className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/50">consola de gestión</span>
             </span>
           </Link>
           <button
@@ -162,9 +169,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <div className="mt-10 px-3 font-mono-ui text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/40">Workspace</div>
+        <div className="mt-10 px-3 font-mono-ui text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/40">Navegación</div>
         <nav className="mt-3 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {visibleNav.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -182,7 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mt-auto space-y-3">
           <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/50 p-3">
             <div className="flex items-center justify-between">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-sidebar-foreground/50">Data source</span>
+              <span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-sidebar-foreground/50">Origen de datos</span>
               <Database size={13} className="text-sidebar-primary" />
             </div>
             <button
@@ -192,14 +199,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <span className="flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${mockMode ? 'bg-sidebar-primary' : 'bg-sidebar-foreground/40'}`} />
-                Mock Mode
+                Modo demostración
               </span>
               <span className={`font-mono-ui text-[10px] ${mockMode ? 'text-sidebar-primary' : 'text-sidebar-foreground/45'}`}>
                 {mockMode ? 'ON' : 'OFF'}
               </span>
             </button>
             <p className="mt-2 text-[10px] leading-relaxed text-sidebar-foreground/40">
-              {mockMode ? 'Demo workspace · local data' : 'Live API · sesión Azure AD'}
+              {mockMode ? 'Demostración · datos locales' : 'Datos reales · sesión institucional'}
             </p>
           </div>
 
@@ -261,7 +268,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               title="Cabecera X-User-Role propagada al BFF"
             >
               <ShieldCheck size={13} />
-              BFF: {user?.role ?? (role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Coordinador' ? 'COORDINADOR' : role === 'Auditor' ? 'AUDITOR' : 'ADMIN')}
+              Rol: {user?.role ?? (role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Coordinador' ? 'COORDINADOR' : role === 'Auditor' ? 'AUDITOR' : 'ADMIN')}
             </span>
             <button
               className="hidden rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary sm:block"
