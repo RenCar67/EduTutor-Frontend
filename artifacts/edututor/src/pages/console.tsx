@@ -366,7 +366,7 @@ export function AnalyticsPage() {
   const topPick = ranked[0];
   const exportCsv = () => { const content = ['servicio,solicitudes,ingresos_estimados', ...ranked.map((item) => `${item.nombre},${item.totalSolicitudes},${item.ingresos}`)].join('\n'); const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'edututor-analytics.csv'; anchor.click(); URL.revokeObjectURL(url); };
   if (!mockMode && (kpisQuery.isLoading || topServicesQuery.isLoading || servicesQuery.isLoading)) return <><PageIntro eyebrow="Insights · Analítica" title="La operación también cuenta una historia." detail="Encuentra los patrones que ayudan a tu equipo a tomar mejores decisiones." /><SkeletonRows count={6} /></>;
-  if (!mockMode && (kpisQuery.isError || topServicesQuery.isError || servicesQuery.isError)) return <ErrorState onRetry={() => { void kpisQuery.refetch(); void topServicesQuery.refetch(); void servicesQuery.refetch(); }} />;
+  if (!mockMode && (kpisQuery.isError || topServicesQuery.isError)) return <ErrorState onRetry={() => { void kpisQuery.refetch(); void topServicesQuery.refetch(); void servicesQuery.refetch(); }} />;
   if (!kpis) return null;
   const hourly = kpis.sesionesPorHora;
   const estados = kpis.estadosActivos;
