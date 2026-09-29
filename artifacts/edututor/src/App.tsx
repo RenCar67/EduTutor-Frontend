@@ -45,6 +45,24 @@ function AdminAuditRoute() {
   );
 }
 
+// ADMIN/COORDINADOR/ESTUDIANTE (SessionsController y GET del catálogo). Un
+// Auditor recibiría 403 del BFF, así que se lo lleva a /forbidden.
+function CatalogRoute() {
+  return (
+    <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'ESTUDIANTE']}>
+      <CatalogPage />
+    </ProtectedRoute>
+  );
+}
+
+function SessionsRoute() {
+  return (
+    <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'ESTUDIANTE']}>
+      <SessionsPage />
+    </ProtectedRoute>
+  );
+}
+
 function WorkspaceRoutes() {
   return (
     <RoutedErrorBoundary>
@@ -53,8 +71,8 @@ function WorkspaceRoutes() {
           <AppShell>
             <Switch>
               <Route path="/" component={DashboardPage} />
-              <Route path="/catalog" component={CatalogPage} />
-              <Route path="/sessions" component={SessionsPage} />
+              <Route path="/catalog" component={CatalogRoute} />
+              <Route path="/sessions" component={SessionsRoute} />
               <Route path="/analytics" component={AdminReportsRoute} />
               <Route path="/reportes" component={AdminReportsRoute} />
               <Route path="/audit" component={AdminAuditRoute} />

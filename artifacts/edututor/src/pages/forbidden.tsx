@@ -17,7 +17,7 @@ export function ForbiddenPage() {
           Rol insuficiente para este módulo.
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          {user?.name ?? 'Tu cuenta'} ({user?.role ?? 'Sin rol'}) no tiene permisos suficientes (ADMIN o AUDITOR) para consultar analítica, reportes o auditoría.
+          {user?.name ?? 'Tu cuenta'} ({user?.role ?? 'Sin rol'}) no tiene permisos para este módulo. Catálogo y sesiones son para Administración, Coordinación y Estudiantes; analítica y auditoría, para Administración y Auditoría.
         </p>
         <div className="mt-7 flex flex-wrap justify-center gap-2">
           <Link href="/" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground">
