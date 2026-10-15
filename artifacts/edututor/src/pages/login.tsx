@@ -60,7 +60,7 @@ export function LoginPage() {
           </span>
           <span>
             <span className="block font-display text-lg font-bold">EduTutor</span>
-            <span className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/45">operations console</span>
+            <span className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/45">consola de gestión</span>
           </span>
         </div>
         <div className="relative mt-auto max-w-sm pb-6">

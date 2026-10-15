@@ -6,8 +6,8 @@ export function SectionHeading({ eyebrow, title, detail, action }: { eyebrow?: s
 }
 
 export function StatusPill({ status }: { status: string }) {
-  const labels: Record<string, string> = { AGENDADA: 'Agendada', CONFIRMADA: 'Confirmada', EN_CURSO: 'En curso', FINALIZADA: 'Finalizada', CANCELADA: 'Cancelada', EXITOSO: 'Exitoso', ERROR: 'Error', ACTIVO: 'Activo', INACTIVO: 'Inactivo' };
-  const classes: Record<string, string> = { AGENDADA: 'bg-[hsl(var(--accent)/.18)] text-[hsl(31_55%_34%)]', CONFIRMADA: 'bg-[hsl(var(--chart-5)/.17)] text-[hsl(195_42%_34%)]', EN_CURSO: 'bg-[hsl(var(--primary)/.13)] text-primary', FINALIZADA: 'bg-[hsl(var(--primary)/.1)] text-primary', CANCELADA: 'bg-[hsl(var(--destructive)/.12)] text-destructive', EXITOSO: 'bg-[hsl(var(--primary)/.1)] text-primary', ERROR: 'bg-[hsl(var(--destructive)/.12)] text-destructive', ACTIVO: 'bg-[hsl(var(--primary)/.1)] text-primary', INACTIVO: 'bg-muted text-muted-foreground' };
+  const labels: Record<string, string> = { SOLICITADA: 'Solicitada', CONFIRMADA: 'Confirmada', ASIGNADA: 'Asignada', EN_CURSO: 'En curso', REALIZADA: 'Realizada', CANCELADA: 'Cancelada', EXITOSO: 'Exitoso', ERROR: 'Error', ACTIVO: 'Activo', INACTIVO: 'Inactivo' };
+  const classes: Record<string, string> = { SOLICITADA: 'bg-[hsl(var(--accent)/.18)] text-[hsl(31_55%_34%)]', CONFIRMADA: 'bg-[hsl(var(--chart-5)/.17)] text-[hsl(195_42%_34%)]', ASIGNADA: 'bg-[hsl(var(--chart-5)/.17)] text-[hsl(195_42%_34%)]', EN_CURSO: 'bg-[hsl(var(--primary)/.13)] text-primary', REALIZADA: 'bg-[hsl(var(--primary)/.1)] text-primary', CANCELADA: 'bg-[hsl(var(--destructive)/.12)] text-destructive', EXITOSO: 'bg-[hsl(var(--primary)/.1)] text-primary', ERROR: 'bg-[hsl(var(--destructive)/.12)] text-destructive', ACTIVO: 'bg-[hsl(var(--primary)/.1)] text-primary', INACTIVO: 'bg-muted text-muted-foreground' };
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono-ui text-[10px] font-medium ${classes[status] ?? 'bg-muted text-muted-foreground'}`} data-testid={`status-${status.toLowerCase()}`}>{(status === 'EN_CURSO' || status === 'EXITOSO') && <span className="h-1.5 w-1.5 rounded-full bg-current" />}{labels[status] ?? status}</span>;
 }
 
@@ -35,6 +35,10 @@ export function MetricCard({ label, value, trend, detail, tone = 'teal' }: { lab
 
 export function ArrowLink({ children }: { children: ReactNode }) {
   return <span className="inline-flex items-center gap-1 text-xs font-bold text-primary transition group-hover:gap-2">{children}<ArrowRight size={14} /></span>;
+}
+
+export function TextField({ label, value, onChange, placeholder, testId, inputMode }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; testId: string; inputMode?: 'text' | 'numeric' }) {
+  return <label className="block"><span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} inputMode={inputMode} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid={testId} /></label>;
 }
 
 export function SelectField({ label, value, onChange, options, testId }: { label: string; value: string; onChange: (value: string) => void; options: { label: string; value: string }[]; testId: string }) {

@@ -8,7 +8,11 @@ const DEFAULT_BFF_SCOPE = 'api://2f150108-cdc6-4386-82cf-f1b957ff99fb/access_as_
 
 const clientId = import.meta.env.VITE_AZURE_CLIENT_ID?.trim() || DEFAULT_CLIENT_ID;
 const tenantId = import.meta.env.VITE_AZURE_TENANT_ID?.trim() || DEFAULT_TENANT_ID;
-const redirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI?.trim() || (window.location.origin + window.location.pathname);
+// Siempre el origen sin path: es una SPA de una sola página servida en "/"
+// (con rutas cliente como /login, /catalog, etc.) — usar la pathname actual
+// aquí produce un redirect_uri distinto según desde qué ruta se inicie sesión,
+// y solo el origen raíz está registrado en Azure (AADSTS50011 si no calzan).
+const redirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI?.trim() || window.location.origin;
 const bffScope = import.meta.env.VITE_AZURE_BFF_SCOPE?.trim() || DEFAULT_BFF_SCOPE;
 
 export const azureConfigured = Boolean(clientId && tenantId);

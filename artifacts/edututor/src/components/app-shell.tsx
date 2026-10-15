@@ -1,9 +1,10 @@
-import { Bell, BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, ListChecks, LogOut, Menu, Search, ShieldCheck, X } from 'lucide-react';
+import { BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, ListChecks, LogOut, Menu, ShieldCheck, X } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { demoAudit, demoDaily, demoHourly, demoServices, demoSessions, demoSummary, lifecycle } from '@/lib/demo-data';
-import type { AnalyticsSummary, EventoAuditoria, MetricaHora, MetricaServicioDia, Servicio, Sesion, SesionInput } from '@workspace/api-client-react';
+import { demoAudit, demoKpis, demoServices, demoSessions, demoTopServices, lifecycle } from '@/lib/demo-data';
+import type { EventoAuditoria, ReportKpis, TopServicio, Servicio, ServicioInput, Sesion, SesionInput } from '@workspace/api-client-react';
 import { useAuth, type AppRole } from '@/auth/auth-context';
+import { NotificationsBell } from '@/components/notifications-bell';
 
 type Role = 'Estudiante' | 'Coordinador' | 'Administrador' | 'Auditor';
 type WorkspaceContextValue = {
@@ -13,10 +14,10 @@ type WorkspaceContextValue = {
   setRole: (value: Role) => void;
   services: Servicio[];
   sessions: Sesion[];
-  summary: AnalyticsSummary;
-  hourly: MetricaHora[];
-  daily: MetricaServicioDia[];
+  kpis: ReportKpis;
+  topServices: TopServicio[];
   audit: EventoAuditoria[];
+  createLocalService: (input: ServicioInput) => void;
   createLocalSession: (input: SesionInput) => void;
   transitionLocalSession: (id: string, status: Sesion['estado']) => void;
 };
@@ -28,7 +29,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const mockMode = mode === 'mock';
   const setMockMode = (value: boolean) => setMode(value ? 'mock' : 'azure');
   const [role, setRole] = useState<Role>('Administrador');
-  const [services] = useState(demoServices);
+  const [services, setServices] = useState(demoServices);
   const [sessions, setSessions] = useState(demoSessions);
   const [audit] = useState(demoAudit);
 
@@ -44,6 +45,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const createLocalService = (input: ServicioInput) => {
+    setServices((current) => [{
+      id: `svc-local-${current.length + 1}`,
+      nombre: input.asignatura,
+      tutorNombre: input.tutor,
+      bloqueHorario: input.bloqueHorario,
+      cupoTotal: input.cupoTotal,
+      cupoDisponible: input.cupoTotal,
+      descripcion: input.descripcion ?? '',
+      categoria: input.categoria ?? 'General',
+      precioHora: input.precioHora ?? 0,
+      duracionMinutos: input.duracionMinutos ?? 60,
+      estado: 'ACTIVO',
+    }, ...current]);
+  };
+
   const createLocalSession = (input: SesionInput) => {
     const service = services.find((item) => item.id === input.servicioId) ?? services[0];
     setSessions((current) => [{
@@ -54,7 +71,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       tutorNombre: service.tutorNombre,
       servicioNombre: service.nombre,
       fechaHora: input.fechaHora,
-      estado: 'AGENDADA',
+      estado: 'SOLICITADA',
       observaciones: input.observaciones ?? '',
     }, ...current]);
   };
@@ -64,8 +81,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!targetSession) {
       throw new Error(`No se encontró la sesión ${id}`);
     }
-    // Regla de invariante Caso 5: No se puede transicionar a EN_CURSO sin tutor asignado previamente
-    if (status === 'EN_CURSO' && (!targetSession.tutorId || targetSession.estado === 'AGENDADA')) {
+    // Invariante real de ms-edututor-sessions: no se puede pasar a EN_CURSO sin tutor asignado.
+    if (status === 'EN_CURSO' && !targetSession.tutorId) {
       throw new Error(
         'IllegalStateTransitionException: No se puede iniciar una sesión (EN_CURSO) sin tutor previamente asignado y confirmado.'
       );
@@ -81,8 +98,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(() => ({
-    mockMode, setMockMode, role, setRole, services, sessions, summary: demoSummary,
-    hourly: demoHourly, daily: demoDaily, audit, createLocalSession, transitionLocalSession,
+    mockMode, setMockMode, role, setRole, services, sessions, kpis: demoKpis,
+    topServices: demoTopServices, audit, createLocalService, createLocalSession, transitionLocalSession,
   }), [mockMode, role, services, sessions, audit, user]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
@@ -94,18 +111,22 @@ export function useWorkspace() {
   return context;
 }
 
-const navItems = [
+// Debe coincidir con los @PreAuthorize del BFF: catálogo y sesiones son de
+// ADMIN/COORDINADOR/ESTUDIANTE; reportes y auditoría, de ADMIN/AUDITOR.
+const OPERATION_ROLES: AppRole[] = ['ADMIN', 'COORDINADOR', 'ESTUDIANTE'];
+const OVERSIGHT_ROLES: AppRole[] = ['ADMIN', 'AUDITOR'];
+const navItems: { href: string; label: string; icon: typeof LayoutDashboard; roles?: AppRole[] }[] = [
   { href: '/', label: 'Resumen', icon: LayoutDashboard },
-  { href: '/catalog', label: 'Catálogo', icon: BookOpen },
-  { href: '/sessions', label: 'Sesiones', icon: ListChecks },
-  { href: '/analytics', label: 'Analítica', icon: LineChart },
-  { href: '/audit', label: 'Auditoría', icon: ShieldCheck },
+  { href: '/catalog', label: 'Catálogo', icon: BookOpen, roles: OPERATION_ROLES },
+  { href: '/sessions', label: 'Sesiones', icon: ListChecks, roles: OPERATION_ROLES },
+  { href: '/analytics', label: 'Analítica', icon: LineChart, roles: OVERSIGHT_ROLES },
+  { href: '/audit', label: 'Auditoría', icon: ShieldCheck, roles: OVERSIGHT_ROLES },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { mockMode, setMockMode, role, setRole } = useWorkspace();
+  const { mockMode, setMockMode, role, setRole, sessions, services, audit } = useWorkspace();
   const { user, logout, loginMock } = useAuth();
   const current = navItems.find((item) => item.href === location);
 
@@ -115,6 +136,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     Administrador: 'ADMIN',
     Auditor: 'AUDITOR',
   };
+
+  const currentRole: AppRole = user?.role ?? roleByLabel[role];
+  const visibleNav = navItems.filter((item) => !item.roles || item.roles.includes(currentRole));
 
   const initials = (user?.name ?? 'EduTutor')
     .split(' ')
@@ -134,7 +158,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <span>
               <span className="block font-display text-[17px] font-bold tracking-tight">EduTutor</span>
-              <span className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/50">operations console</span>
+              <span className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/50">consola de gestión</span>
             </span>
           </Link>
           <button
@@ -146,9 +170,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <div className="mt-10 px-3 font-mono-ui text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/40">Workspace</div>
+        <div className="mt-10 px-3 font-mono-ui text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/40">Navegación</div>
         <nav className="mt-3 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {visibleNav.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -166,7 +190,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mt-auto space-y-3">
           <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/50 p-3">
             <div className="flex items-center justify-between">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-sidebar-foreground/50">Data source</span>
+              <span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-sidebar-foreground/50">Origen de datos</span>
               <Database size={13} className="text-sidebar-primary" />
             </div>
             <button
@@ -176,14 +200,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <span className="flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${mockMode ? 'bg-sidebar-primary' : 'bg-sidebar-foreground/40'}`} />
-                Mock Mode
+                Modo demostración
               </span>
               <span className={`font-mono-ui text-[10px] ${mockMode ? 'text-sidebar-primary' : 'text-sidebar-foreground/45'}`}>
                 {mockMode ? 'ON' : 'OFF'}
               </span>
             </button>
             <p className="mt-2 text-[10px] leading-relaxed text-sidebar-foreground/40">
-              {mockMode ? 'Demo workspace · local data' : 'Live API · sesión Azure AD'}
+              {mockMode ? 'Demostración · datos locales' : 'Datos reales · sesión institucional'}
             </p>
           </div>
 
@@ -245,21 +269,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               title="Cabecera X-User-Role propagada al BFF"
             >
               <ShieldCheck size={13} />
-              BFF: {user?.role ?? (role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Coordinador' ? 'COORDINADOR' : role === 'Auditor' ? 'AUDITOR' : 'ADMIN')}
+              Rol: {user?.role ?? (role === 'Estudiante' ? 'ESTUDIANTE' : role === 'Coordinador' ? 'COORDINADOR' : role === 'Auditor' ? 'AUDITOR' : 'ADMIN')}
             </span>
-            <button
-              className="hidden rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary sm:block"
-              data-testid="button-search"
-            >
-              <Search size={17} />
-            </button>
-            <button
-              className="relative rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary"
-              data-testid="button-notifications"
-            >
-              <Bell size={17} />
-              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />
-            </button>
+            <NotificationsBell mockMode={mockMode} sessions={sessions} services={services} audit={audit} />
             <div className="ml-1 hidden h-8 w-px bg-border sm:block" />
             <label className="relative">
               <span className="sr-only">Seleccionar rol</span>
