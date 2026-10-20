@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { AppShell, WorkspaceProvider } from '@/components/app-shell';
 import { AnalyticsPage, AuditPage, CatalogPage, DashboardPage, SessionsPage } from '@/pages/console';
+import { TutorsPage } from '@/pages/tutors';
 import { AuthProvider } from '@/auth/auth-context';
 import { ProtectedRoute } from '@/auth/protected-route';
 import { ForbiddenPage } from '@/pages/forbidden';
@@ -63,6 +64,15 @@ function SessionsRoute() {
   );
 }
 
+// El directorio de tutores lo administra solo ADMIN (el BFF exige lo mismo).
+function TutorsRoute() {
+  return (
+    <ProtectedRoute allowedRoles={['ADMIN']}>
+      <TutorsPage />
+    </ProtectedRoute>
+  );
+}
+
 function WorkspaceRoutes() {
   return (
     <RoutedErrorBoundary>
@@ -74,6 +84,7 @@ function WorkspaceRoutes() {
               <Route path="/dashboard" component={DashboardPage} />
               <Route path="/catalog" component={CatalogRoute} />
               <Route path="/sessions" component={SessionsRoute} />
+              <Route path="/tutors" component={TutorsRoute} />
               <Route path="/analytics" component={AdminReportsRoute} />
               <Route path="/reports" component={AdminReportsRoute} />
               <Route path="/reportes" component={AdminReportsRoute} />

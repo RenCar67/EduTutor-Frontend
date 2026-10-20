@@ -33,7 +33,10 @@ import type {
   Sesion,
   SesionInput,
   SessionStatusInput,
-  TopServicio
+  TopServicio,
+  Tutor,
+  TutorInput,
+  TutorUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -304,6 +307,260 @@ export const useCreateService = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateServiceMutationOptions(options));
+    }
+
+export const getListTutorsUrl = () => {
+
+
+
+
+  return `/api/catalog/tutors`
+}
+
+/**
+ * @summary List the tutor directory
+ */
+export const listTutors = async ( options?: Parameters<typeof customFetch>[1]): Promise<Tutor[]> => {
+
+  return customFetch<Tutor[]>(getListTutorsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTutorsQueryKey = () => {
+    return [
+    `/api/catalog/tutors`
+    ] as const;
+    }
+
+
+export const getListTutorsQueryOptions = <TData = Awaited<ReturnType<typeof listTutors>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTutors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTutorsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTutors>>> = ({ signal }) => listTutors({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTutors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTutorsQueryResult = NonNullable<Awaited<ReturnType<typeof listTutors>>>
+export type ListTutorsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the tutor directory
+ */
+
+export function useListTutors<TData = Awaited<ReturnType<typeof listTutors>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTutors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTutorsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateTutorUrl = () => {
+
+
+
+
+  return `/api/catalog/tutors`
+}
+
+/**
+ * @summary Add a tutor to the directory (ADMIN only)
+ */
+export const createTutor = async (tutorInput: TutorInput, options?: Parameters<typeof customFetch>[1]): Promise<Tutor> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Tutor>(getCreateTutorUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(tutorInput)
+  }
+);}
+
+
+
+
+
+export const getCreateTutorMutationKey = () => ['createTutor'] as const;
+
+export const getCreateTutorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTutor>>, TError,CreateTutorMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTutor>>, TError,CreateTutorMutationVariables, TContext> => {
+
+const mutationKey = getCreateTutorMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTutor>>, CreateTutorMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTutor(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTutorMutationResult = NonNullable<Awaited<ReturnType<typeof createTutor>>>
+    export type CreateTutorMutationBody = BodyType<TutorInput>
+    export type CreateTutorMutationError = ErrorType<unknown>
+    export type CreateTutorMutationVariables = {data: BodyType<TutorInput>}
+
+    /**
+ * @summary Add a tutor to the directory (ADMIN only)
+ */
+export const useCreateTutor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTutor>>, TError,CreateTutorMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTutor>>,
+        TError,
+        CreateTutorMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateTutorMutationOptions(options));
+    }
+
+export const getUpdateTutorUrl = (id: string,) => {
+
+
+
+
+  return `/api/catalog/tutors/${id}`
+}
+
+/**
+ * @summary Update a tutor - name, active flag or services (ADMIN only)
+ */
+export const updateTutor = async (id: string,
+    tutorUpdate: TutorUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Tutor> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Tutor>(getUpdateTutorUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(tutorUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateTutorMutationKey = () => ['updateTutor'] as const;
+
+export const getUpdateTutorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTutor>>, TError,UpdateTutorMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTutor>>, TError,UpdateTutorMutationVariables, TContext> => {
+
+const mutationKey = getUpdateTutorMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTutor>>, UpdateTutorMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTutor(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTutorMutationResult = NonNullable<Awaited<ReturnType<typeof updateTutor>>>
+    export type UpdateTutorMutationBody = BodyType<TutorUpdate>
+    export type UpdateTutorMutationError = ErrorType<unknown>
+    export type UpdateTutorMutationVariables = {id: string;data: BodyType<TutorUpdate>}
+
+    /**
+ * @summary Update a tutor - name, active flag or services (ADMIN only)
+ */
+export const useUpdateTutor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTutor>>, TError,UpdateTutorMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTutor>>,
+        TError,
+        UpdateTutorMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateTutorMutationOptions(options));
     }
 
 export const getListSessionsUrl = (params?: ListSessionsParams,) => {

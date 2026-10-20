@@ -26,3 +26,6 @@ export * from './sesionesPorHora';
 export * from './sesionInput';
 export * from './sessionStatusInput';
 export * from './topServicio';
+export * from './tutor';
+export * from './tutorInput';
+export * from './tutorUpdate';

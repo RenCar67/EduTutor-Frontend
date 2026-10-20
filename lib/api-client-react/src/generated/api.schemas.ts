@@ -60,6 +60,25 @@ export interface ServicioInput {
   duracionMinutos?: number;
 }
 
+export interface Tutor {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  /** Servicios que este tutor puede dictar */
+  servicioIds: string[];
+}
+
+export interface TutorInput {
+  nombre: string;
+  servicioIds?: string[];
+}
+
+export interface TutorUpdate {
+  nombre?: string;
+  activo?: boolean;
+  servicioIds?: string[];
+}
+
 export interface Sesion {
   id: string;
   servicioId: string;
@@ -84,7 +103,7 @@ export interface SesionInput {
 
 export interface SessionStatusInput {
   status: EstadoSesion;
-  /** Requerido si status=ASIGNADA */
+  /** Id del tutor del directorio. Requerido si status=ASIGNADA */
   tutorId?: string;
 }
 

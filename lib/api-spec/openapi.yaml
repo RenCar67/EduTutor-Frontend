@@ -67,6 +67,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/Servicio"
 
+  /catalog/tutors:
+    get:
+      operationId: listTutors
+      tags: [catalog]
+      summary: List the tutor directory
+      responses:
+        "200":
+          description: Tutors and the services each one can teach
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tutor"
+    post:
+      operationId: createTutor
+      tags: [catalog]
+      summary: Add a tutor to the directory (ADMIN only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TutorInput"
+      responses:
+        "201":
+          description: Created tutor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tutor"
+
+  /catalog/tutors/{id}:
+    put:
+      operationId: updateTutor
+      tags: [catalog]
+      summary: Update a tutor - name, active flag or services (ADMIN only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TutorUpdate"
+      responses:
+        "200":
+          description: Updated tutor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tutor"
+
   # ==========================================================================
   # 2. SESSIONS CONTROLLER (/api/sessions/...)
   # ==========================================================================
@@ -288,6 +345,33 @@ components:
         categoria: { type: string }
         precioHora: { type: number }
         duracionMinutos: { type: integer }
+    Tutor:
+      type: object
+      required: [id, nombre, activo, servicioIds]
+      properties:
+        id: { type: string }
+        nombre: { type: string }
+        activo: { type: boolean }
+        servicioIds:
+          type: array
+          items: { type: string }
+          description: "Servicios que este tutor puede dictar"
+    TutorInput:
+      type: object
+      required: [nombre]
+      properties:
+        nombre: { type: string }
+        servicioIds:
+          type: array
+          items: { type: string }
+    TutorUpdate:
+      type: object
+      properties:
+        nombre: { type: string }
+        activo: { type: boolean }
+        servicioIds:
+          type: array
+          items: { type: string }
     Sesion:
       type: object
       required: [id, servicioId, estudianteId, estado]
@@ -319,7 +403,7 @@ components:
       required: [status]
       properties:
         status: { $ref: "#/components/schemas/EstadoSesion" }
-        tutorId: { type: string, description: "Requerido si status=ASIGNADA" }
+        tutorId: { type: string, description: "Id del tutor del directorio. Requerido si status=ASIGNADA" }
     SesionesPorHora:
       type: object
       required: [hora, creadas, realizadas, canceladas]

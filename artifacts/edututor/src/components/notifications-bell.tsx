@@ -11,6 +11,8 @@ import {
 } from '@workspace/api-client-react';
 import type { EventoAuditoria, Servicio, Sesion } from '@workspace/api-client-react';
 import { useAuth } from '@/auth/auth-context';
+import { useTutors } from '@/hooks/use-tutors';
+import { nombreDeTutor } from '@/lib/tutors';
 import { eventLabel, eventSummary } from '@/lib/audit-format';
 
 type Item = { key: string; title: string; detail: string };
@@ -29,6 +31,7 @@ export function NotificationsBell({ mockMode, sessions: localSessions, services:
   const usesSessions = role === 'ESTUDIANTE' || role === 'COORDINADOR';
   const usesAudit = role === 'ADMIN' || role === 'AUDITOR';
 
+  const tutors = useTutors();
   const sessionsQuery = useListSessions(undefined, { query: { enabled: !mockMode && usesSessions, refetchInterval: POLL_MS, queryKey: getListSessionsQueryKey(), retry: false } });
   const servicesQuery = useListServices({ query: { enabled: !mockMode && usesSessions, queryKey: getListServicesQueryKey(), retry: false } });
   const auditQuery = useListAuditEvents(undefined, { query: { enabled: !mockMode && usesAudit, refetchInterval: POLL_MS, queryKey: getListAuditEventsQueryKey(), retry: false } });
@@ -48,7 +51,7 @@ export function NotificationsBell({ mockMode, sessions: localSessions, services:
         switch (s.estado) {
           case 'SOLICITADA': return { ...base, title: 'Solicitud recibida', detail: `${name} · esperando confirmación` };
           case 'CONFIRMADA': return { ...base, title: 'Tu sesión fue confirmada', detail: `${name} · falta asignar tutor` };
-          case 'ASIGNADA': return { ...base, title: 'Te asignaron un tutor', detail: `${name} · ${s.tutorNombre ?? s.tutorId ?? 'tutor por definir'}` };
+          case 'ASIGNADA': return { ...base, title: 'Te asignaron un tutor', detail: `${name} · ${s.tutorId ? nombreDeTutor(s, tutors) : 'tutor por definir'}` };
           case 'EN_CURSO': return { ...base, title: 'Tu sesión está en curso', detail: name };
           case 'REALIZADA': return { ...base, title: 'Sesión realizada', detail: name };
           default: return { ...base, title: 'Sesión cancelada', detail: name };

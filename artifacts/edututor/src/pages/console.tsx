@@ -1,5 +1,6 @@
 import { Activity, ArrowUpRight, BarChart3, CalendarClock, CheckCircle2, ChevronDown, Download, Filter, MoreHorizontal, Plus, Search, Sparkles, Target, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -19,9 +20,12 @@ import {
   useListSessions,
   useTransitionSession,
 } from '@workspace/api-client-react';
-import type { EstadoSesion, Servicio, ServicioInput, Sesion, SesionInput } from '@workspace/api-client-react';
+import type { EstadoSesion, Servicio, ServicioInput, Sesion, SesionInput, Tutor } from '@workspace/api-client-react';
 import { useAuth } from '@/auth/auth-context';
 import { useWorkspace, lifecycle } from '@/components/app-shell';
+import { AssignTutorDialog } from '@/components/assign-tutor-dialog';
+import { useTutors } from '@/hooks/use-tutors';
+import { nombreDeTutor } from '@/lib/tutors';
 import { useToast } from '@/hooks/use-toast';
 import { ActionButton, ArrowLink, EmptyState, ErrorState, MetricCard, SectionHeading, SelectField, SkeletonRows, StatusPill, TextField } from '@/components/ui';
 import { EVENT_LABELS, STATE_LABELS, eventLabel, eventSummary, humanize } from '@/lib/audit-format';
@@ -33,13 +37,10 @@ const statusLabels: Record<string, string> = { SOLICITADA: 'Solicitadas', CONFIR
 function resolveServicioNombre(session: Sesion, services: Servicio[]): string {
   return session.servicioNombre || services.find((s) => s.id === session.servicioId)?.nombre || 'Servicio';
 }
-function resolveTutorNombre(session: Sesion): string {
-  return session.tutorNombre || session.tutorId || 'Sin asignar';
-}
 const money = (value: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 const dateTime = (value: string) => new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 
-function PageIntro({ eyebrow, title, detail, action }: { eyebrow: string; title: string; detail: string; action?: React.ReactNode }) {
+export function PageIntro({ eyebrow, title, detail, action }: { eyebrow: string; title: string; detail: string; action?: React.ReactNode }) {
   return <div className="mb-8 flex flex-wrap items-start justify-between gap-4"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-primary">{eyebrow}</p><h2 className="mt-2 max-w-3xl font-display text-[30px] font-bold leading-[1.05] tracking-tight md:text-[38px]">{title}</h2><p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">{detail}</p></div>{action}</div>;
 }
 
@@ -118,7 +119,7 @@ export function DashboardPage() {
 function BookOpenIcon() { return <span className="font-display text-[22px] leading-none">01</span>; }
 
 function SessionMiniCard({ session, services }: { session: Sesion; services: Servicio[] }) {
-  const tutorNombre = resolveTutorNombre(session);
+  const tutorNombre = nombreDeTutor(session, useTutors());
   const servicioNombre = resolveServicioNombre(session, services);
   return <div className="group flex items-center gap-3 rounded-2xl border border-card-border bg-card p-4 transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted font-display text-sm font-bold text-primary">{tutorNombre.split(' ').map((name) => name[0]).join('').slice(0, 2)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-bold">{servicioNombre}</p><StatusPill status={session.estado} /></div><p className="mt-1 truncate text-[11px] text-muted-foreground">{session.fechaHora ? dateTime(session.fechaHora) : 'Sin horario'} · {tutorNombre}</p></div><span className="font-mono-ui text-[10px] text-muted-foreground">{session.id}</span></div>;
 }
@@ -238,23 +239,21 @@ export function SessionsPage() {
   const sessionsQuery = useListSessions(undefined, { query: { enabled: !mockMode, queryKey: getListSessionsQueryKey() } });
   const servicesQuery = useListServices({ query: { enabled: !mockMode, queryKey: getListServicesQueryKey() } });
   const services = mockMode ? localServices : (Array.isArray(servicesQuery.data) ? servicesQuery.data : []);
+  const tutors = useTutors();
+  const [assigning, setAssigning] = useState<Sesion | null>(null);
   const transitionMutation = useTransitionSession();
   const createMutation = useCreateSession();
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const allSessions = mockMode ? localSessions : (Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []);
-  const filtered = allSessions.filter((session) => (!status || session.estado === status) && (!search || `${session.id} ${resolveServicioNombre(session, services)} ${resolveTutorNombre(session)}`.toLowerCase().includes(search.toLowerCase())));
+  const filtered = allSessions.filter((session) => (!status || session.estado === status) && (!search || `${session.id} ${resolveServicioNombre(session, services)} ${nombreDeTutor(session, tutors)}`.toLowerCase().includes(search.toLowerCase())));
+  // Asignar abre el selector de tutor; el resto de los cambios van directo.
   const transition = (session: Sesion, next: EstadoSesion) => {
-    // Para poder iniciar la sesión el backend exige un tutor, así que al asignar
-    // se usa el que ya tenga o, si no, el tutor del servicio.
-    const tutorId = next === 'ASIGNADA'
-      ? (session.tutorId ?? services.find((service) => service.id === session.servicioId)?.tutorNombre)
-      : undefined;
-    if (next === 'ASIGNADA' && !tutorId) {
-      toast({ title: 'No se pudo asignar', description: 'No se encontró un tutor para este servicio.', variant: 'destructive' });
-      return;
-    }
+    if (next === 'ASIGNADA') setAssigning(session);
+    else runTransition(session, next);
+  };
+  const runTransition = (session: Sesion, next: EstadoSesion, tutorId?: string) => {
     if (mockMode) {
       try {
         transitionLocalSession(session.id, next, tutorId);
@@ -338,17 +337,42 @@ export function SessionsPage() {
   return <div className="space-y-7">
     <PageIntro eyebrow="Operación · Sesiones" title="Cada encuentro, en contexto." detail="Sigue el ciclo completo de tus sesiones. Los cambios de estado quedan visibles para todo el equipo." action={<ActionButton onClick={() => setShowCreate(true)} testId="button-new-session"><Plus size={15} /> Nueva sesión</ActionButton>} />
     <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 shadow-[0_8px_26px_hsl(var(--foreground)/.025)] md:flex-row md:items-center"><div className="relative flex-1"><Search size={15} className="absolute left-3 top-3 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por ID, servicio o tutor..." className="w-full rounded-xl border border-input bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary" data-testid="input-sessions-search" /></div><div className="flex items-center gap-2"><SelectField label="" value={status} onChange={setStatus} options={Object.keys(statusLabels).map((item) => ({ value: item, label: statusLabels[item] }))} testId="select-session-status" /><span className="hidden font-mono-ui text-[10px] text-muted-foreground sm:block">{filtered.length} registros</span></div></div>
-    {!mockMode && sessionsQuery.isLoading ? <SkeletonRows count={6} /> : !mockMode && sessionsQuery.isError ? <ErrorState onRetry={() => void sessionsQuery.refetch()} /> : filtered.length === 0 ? <EmptyState title="No hay sesiones con esos filtros" detail="Ajusta la búsqueda o agenda una nueva sesión para empezar." action={<ActionButton onClick={() => setShowCreate(true)} testId="button-empty-new-session"><Plus size={14} /> Nueva sesión</ActionButton>} /> : <div className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-[0_8px_26px_hsl(var(--foreground)/.025)]"><div className="hidden grid-cols-[1.1fr_1.4fr_1.1fr_1fr_1fr_.55fr] gap-3 border-b border-border/70 bg-muted/40 px-5 py-3 font-mono-ui text-[9px] uppercase tracking-[.13em] text-muted-foreground md:grid"><span>Sesión</span><span>Servicio</span><span>Tutor</span><span>Fecha</span><span>Estado</span><span /></div>{filtered.map((session) => <SessionRow key={session.id} session={session} services={services} onTransition={(next) => transition(session, next)} pending={transitionMutation.isPending && transitionMutation.variables?.id === session.id} />)}</div>}
+    {!mockMode && sessionsQuery.isLoading ? <SkeletonRows count={6} /> : !mockMode && sessionsQuery.isError ? <ErrorState onRetry={() => void sessionsQuery.refetch()} /> : filtered.length === 0 ? <EmptyState title="No hay sesiones con esos filtros" detail="Ajusta la búsqueda o agenda una nueva sesión para empezar." action={<ActionButton onClick={() => setShowCreate(true)} testId="button-empty-new-session"><Plus size={14} /> Nueva sesión</ActionButton>} /> : <div className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-[0_8px_26px_hsl(var(--foreground)/.025)]"><div className="hidden grid-cols-[1.1fr_1.4fr_1.1fr_1fr_1fr_.55fr] gap-3 border-b border-border/70 bg-muted/40 px-5 py-3 font-mono-ui text-[9px] uppercase tracking-[.13em] text-muted-foreground md:grid"><span>Sesión</span><span>Servicio</span><span>Tutor</span><span>Fecha</span><span>Estado</span><span /></div>{filtered.map((session) => <SessionRow key={session.id} session={session} services={services} tutors={tutors} onTransition={(next) => transition(session, next)} pending={transitionMutation.isPending && transitionMutation.variables?.id === session.id} />)}</div>}
+    {assigning && <AssignTutorDialog session={assigning} serviceName={resolveServicioNombre(assigning, services)} tutors={tutors} sessions={allSessions} pending={transitionMutation.isPending}
+      onClose={() => setAssigning(null)} onConfirm={(tutorId) => { runTransition(assigning, 'ASIGNADA', tutorId); setAssigning(null); }} />}
     {showCreate && <CreateSessionDialog services={services} onClose={() => setShowCreate(false)} onCreate={create} pending={createMutation.isPending} />}
   </div>;
 }
 
-function SessionRow({ session, services, onTransition, pending }: { session: Sesion; services: Servicio[]; onTransition: (status: EstadoSesion) => void; pending: boolean }) {
+function SessionRow({ session, services, tutors, onTransition, pending }: { session: Sesion; services: Servicio[]; tutors: Tutor[]; onTransition: (status: EstadoSesion) => void; pending: boolean }) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const next = lifecycle[session.estado] ?? [];
+
+  // El menú se dibuja en el body (portal) con posición fija calculada desde el
+  // botón: así ningún contenedor con overflow o transform lo recorta ni lo
+  // desplaza. Si abajo no cabe, se abre hacia arriba.
+  const toggleMenu = () => {
+    if (open) { setOpen(false); return; }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const alto = next.length * 36 + 14;
+      const arriba = window.innerHeight - rect.bottom < alto + 12;
+      setMenuPos({ top: arriba ? rect.top - alto - 4 : rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 160) });
+    }
+    setOpen(true);
+  };
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
+  }, [open]);
   const servicioNombre = resolveServicioNombre(session, services);
-  const tutorNombre = resolveTutorNombre(session);
-  return <div className="relative grid gap-3 border-b border-border/60 px-5 py-4 last:border-b-0 md:grid-cols-[1.1fr_1.4fr_1.1fr_1fr_1fr_.55fr] md:items-center" data-testid={`row-session-${session.id}`}><div><p className="font-mono-ui text-[11px] font-medium text-primary">{session.id}</p><p className="mt-1 text-[10px] text-muted-foreground">estudiante · {session.estudianteId}</p></div><div><p className="text-sm font-semibold">{servicioNombre}</p><p className="mt-1 text-[10px] text-muted-foreground">{session.observaciones || 'Sin observaciones'}</p></div><p className="text-xs text-foreground/75"><span className="mr-1 text-muted-foreground md:hidden">Tutor ·</span>{tutorNombre}</p><p className="text-xs text-foreground/75"><span className="mr-1 text-muted-foreground md:hidden">Cuándo ·</span>{session.fechaHora ? dateTime(session.fechaHora) : 'Sin horario'}</p><div><StatusPill status={session.estado} />{next.length > 0 && <div className="relative mt-2"><button onClick={() => setOpen(!open)} disabled={pending} className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline" data-testid={`button-transition-${session.id}`}>{pending ? 'Guardando...' : 'Mover estado'} <ChevronDown size={12} /></button>{open && <div className="absolute left-0 top-6 z-10 w-36 rounded-xl border border-border bg-popover p-1.5 shadow-xl">{next.map((item) => <button key={item} onClick={() => { onTransition(item); setOpen(false); }} className="block w-full rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold hover:bg-muted" data-testid={`button-transition-${session.id}-${item}`}>→ {statusLabels[item]}</button>)}</div>}</div>}</div><button className="hidden place-items-center rounded-lg p-2 text-muted-foreground hover:bg-muted md:grid" data-testid={`button-session-menu-${session.id}`}><MoreHorizontal size={16} /></button></div>;
+  const tutorNombre = nombreDeTutor(session, tutors);
+  return <div className="relative grid gap-3 border-b border-border/60 px-5 py-4 last:border-b-0 md:grid-cols-[1.1fr_1.4fr_1.1fr_1fr_1fr_.55fr] md:items-center" data-testid={`row-session-${session.id}`}><div><p className="font-mono-ui text-[11px] font-medium text-primary">{session.id}</p><p className="mt-1 text-[10px] text-muted-foreground">estudiante · {session.estudianteId}</p></div><div><p className="text-sm font-semibold">{servicioNombre}</p><p className="mt-1 text-[10px] text-muted-foreground">{session.observaciones || 'Sin observaciones'}</p></div><p className="text-xs text-foreground/75"><span className="mr-1 text-muted-foreground md:hidden">Tutor ·</span>{tutorNombre}</p><p className="text-xs text-foreground/75"><span className="mr-1 text-muted-foreground md:hidden">Cuándo ·</span>{session.fechaHora ? dateTime(session.fechaHora) : 'Sin horario'}</p><div><StatusPill status={session.estado} />{next.length > 0 && <div className="relative mt-2"><button ref={triggerRef} onClick={toggleMenu} disabled={pending} className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline" data-testid={`button-transition-${session.id}`}>{pending ? 'Guardando...' : 'Mover estado'} <ChevronDown size={12} /></button>{open && menuPos && createPortal(<><div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} /><div className="fixed z-[70] w-36 rounded-xl border border-border bg-popover p-1.5 shadow-xl" style={{ top: menuPos.top, left: menuPos.left }}>{next.map((item) => <button key={item} onClick={() => { onTransition(item); setOpen(false); }} className="block w-full rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold hover:bg-muted" data-testid={`button-transition-${session.id}-${item}`}>→ {statusLabels[item]}</button>)}</div></>, document.body)}</div>}</div><button className="hidden place-items-center rounded-lg p-2 text-muted-foreground hover:bg-muted md:grid" data-testid={`button-session-menu-${session.id}`}><MoreHorizontal size={16} /></button></div>;
 }
 
 function CreateSessionDialog({ services, onClose, onCreate, pending }: { services: import('@workspace/api-client-react').Servicio[]; onClose: () => void; onCreate: (input: SesionInput) => void; pending: boolean }) {

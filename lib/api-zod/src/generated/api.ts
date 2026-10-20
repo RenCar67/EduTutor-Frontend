@@ -66,6 +66,55 @@ export const CreateServiceResponse = zod.object({
 
 
 /**
+ * @summary List the tutor directory
+ */
+export const ListTutorsResponseItem = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string(),
+  "activo": zod.boolean(),
+  "servicioIds": zod.array(zod.string()).describe('Servicios que este tutor puede dictar')
+})
+export const ListTutorsResponse = zod.array(ListTutorsResponseItem)
+
+
+/**
+ * @summary Add a tutor to the directory (ADMIN only)
+ */
+export const CreateTutorBody = zod.object({
+  "nombre": zod.string(),
+  "servicioIds": zod.array(zod.string()).optional()
+})
+
+export const CreateTutorResponse = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string(),
+  "activo": zod.boolean(),
+  "servicioIds": zod.array(zod.string()).describe('Servicios que este tutor puede dictar')
+})
+
+
+/**
+ * @summary Update a tutor - name, active flag or services (ADMIN only)
+ */
+export const UpdateTutorParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateTutorBody = zod.object({
+  "nombre": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "servicioIds": zod.array(zod.string()).optional()
+})
+
+export const UpdateTutorResponse = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string(),
+  "activo": zod.boolean(),
+  "servicioIds": zod.array(zod.string()).describe('Servicios que este tutor puede dictar')
+})
+
+
+/**
  * @summary List tutoring sessions
  */
 export const ListSessionsQueryParams = zod.object({
@@ -121,7 +170,7 @@ export const TransitionSessionParams = zod.object({
 
 export const TransitionSessionBody = zod.object({
   "status": zod.enum(['SOLICITADA', 'CONFIRMADA', 'ASIGNADA', 'EN_CURSO', 'REALIZADA', 'CANCELADA']).describe('SOLICITADA -> CONFIRMADA -> ASIGNADA -> EN_CURSO -> REALIZADA, o CANCELADA desde cualquier estado previo a EN_CURSO.\n'),
-  "tutorId": zod.string().optional().describe('Requerido si status=ASIGNADA')
+  "tutorId": zod.string().optional().describe('Id del tutor del directorio. Requerido si status=ASIGNADA')
 })
 
 export const TransitionSessionResponse = zod.object({

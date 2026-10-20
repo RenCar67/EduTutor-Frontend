@@ -9,6 +9,6 @@ import type { EstadoSesion } from './estadoSesion';
 
 export interface SessionStatusInput {
   status: EstadoSesion;
-  /** Requerido si status=ASIGNADA */
+  /** Id del tutor del directorio. Requerido si status=ASIGNADA */
   tutorId?: string;
 }

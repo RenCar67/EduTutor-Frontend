@@ -5,6 +5,7 @@ import type {
   TopServicio,
   Servicio,
   Sesion,
+  Tutor,
 } from '@workspace/api-client-react';
 
 export const demoServices: Servicio[] = [
@@ -85,6 +86,21 @@ const at = (days: number, hour: number, minute = 0) => {
 
 // Estados reales de ms-edututor-sessions: SOLICITADA -> CONFIRMADA -> ASIGNADA
 // -> EN_CURSO -> REALIZADA, o CANCELADA antes de EN_CURSO.
+// Directorio de demostración: cada tutor queda habilitado para todos los
+// servicios de las categorías que ya dicta (igual que el seeder del catálogo).
+export const demoTutors: Tutor[] = (() => {
+  const categorias = new Map<string, Set<string>>();
+  for (const s of demoServices) {
+    categorias.set(s.tutorNombre, (categorias.get(s.tutorNombre) ?? new Set()).add(s.categoria));
+  }
+  return [...categorias].map(([nombre, cats], i) => ({
+    id: `tut-${i + 1}`,
+    nombre,
+    activo: true,
+    servicioIds: demoServices.filter((s) => cats.has(s.categoria)).map((s) => s.id),
+  }));
+})();
+
 export const demoSessions: Sesion[] = [
   { id: 'SES-1048', servicioId: 'svc-calculo', estudianteId: 'STU-204', tutorId: 'T-18', tutorNombre: 'Valentina Ruiz', servicioNombre: 'Cálculo diferencial', fechaHora: at(0, 10, 30), estado: 'ASIGNADA', observaciones: 'Repasar regla de la cadena antes del parcial.' },
   { id: 'SES-1047', servicioId: 'svc-ingles', estudianteId: 'STU-118', tutorId: 'T-09', tutorNombre: 'Andrés Molina', servicioNombre: 'Inglés conversacional', fechaHora: at(0, 13), estado: 'EN_CURSO', observaciones: 'Simulación de entrevista laboral.' },

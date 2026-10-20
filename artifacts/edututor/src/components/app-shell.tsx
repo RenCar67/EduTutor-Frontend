@@ -1,8 +1,8 @@
-import { BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, ListChecks, LogOut, Menu, ShieldCheck, X } from 'lucide-react';
+import { BookOpen, ChevronDown, Database, LayoutDashboard, LineChart, ListChecks, LogOut, Menu, ShieldCheck, Users, X } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { demoAudit, demoKpis, demoServices, demoSessions, demoTopServices, lifecycle } from '@/lib/demo-data';
-import type { EventoAuditoria, ReportKpis, TopServicio, Servicio, ServicioInput, Sesion, SesionInput } from '@workspace/api-client-react';
+import { demoAudit, demoKpis, demoServices, demoSessions, demoTopServices, demoTutors, lifecycle } from '@/lib/demo-data';
+import type { EventoAuditoria, ReportKpis, TopServicio, Servicio, ServicioInput, Sesion, SesionInput, Tutor, TutorInput, TutorUpdate } from '@workspace/api-client-react';
 import { useAuth, type AppRole } from '@/auth/auth-context';
 import { NotificationsBell } from '@/components/notifications-bell';
 
@@ -17,6 +17,9 @@ type WorkspaceContextValue = {
   kpis: ReportKpis;
   topServices: TopServicio[];
   audit: EventoAuditoria[];
+  tutors: Tutor[];
+  createLocalTutor: (input: TutorInput) => void;
+  updateLocalTutor: (id: string, update: TutorUpdate) => void;
   createLocalService: (input: ServicioInput) => void;
   createLocalSession: (input: SesionInput) => void;
   transitionLocalSession: (id: string, status: Sesion['estado'], tutorId?: string) => void;
@@ -31,6 +34,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('Administrador');
   const [services, setServices] = useState(demoServices);
   const [sessions, setSessions] = useState(demoSessions);
+  const [tutors, setTutors] = useState(demoTutors);
   const [audit] = useState(demoAudit);
 
   useEffect(() => {
@@ -44,6 +48,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setRole(roleLabels[user.role]);
     }
   }, [user]);
+
+  const createLocalTutor = (input: TutorInput) => {
+    setTutors((current) => [...current, {
+      id: `tut-local-${current.length + 1}`,
+      nombre: input.nombre,
+      activo: true,
+      servicioIds: input.servicioIds ?? [],
+    }]);
+  };
+
+  const updateLocalTutor = (id: string, update: TutorUpdate) => {
+    setTutors((current) => current.map((tutor) => tutor.id === id ? {
+      ...tutor,
+      ...(update.nombre !== undefined ? { nombre: update.nombre } : {}),
+      ...(update.activo !== undefined ? { activo: update.activo } : {}),
+      ...(update.servicioIds !== undefined ? { servicioIds: update.servicioIds } : {}),
+    } : tutor));
+  };
 
   const createLocalService = (input: ServicioInput) => {
     setServices((current) => [{
@@ -101,8 +123,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     mockMode, setMockMode, role, setRole, services, sessions, kpis: demoKpis,
-    topServices: demoTopServices, audit, createLocalService, createLocalSession, transitionLocalSession,
-  }), [mockMode, role, services, sessions, audit, user]);
+    topServices: demoTopServices, audit, tutors, createLocalTutor, updateLocalTutor, createLocalService, createLocalSession, transitionLocalSession,
+  }), [mockMode, role, services, sessions, tutors, audit, user]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
@@ -121,6 +143,7 @@ const navItems: { href: string; label: string; icon: typeof LayoutDashboard; rol
   { href: '/', label: 'Resumen', icon: LayoutDashboard },
   { href: '/catalog', label: 'Catálogo', icon: BookOpen, roles: OPERATION_ROLES },
   { href: '/sessions', label: 'Sesiones', icon: ListChecks, roles: OPERATION_ROLES },
+  { href: '/tutors', label: 'Tutores', icon: Users, roles: ['ADMIN'] },
   { href: '/analytics', label: 'Analítica', icon: LineChart, roles: OVERSIGHT_ROLES },
   { href: '/audit', label: 'Auditoría', icon: ShieldCheck, roles: OVERSIGHT_ROLES },
 ];
