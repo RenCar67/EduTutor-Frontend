@@ -246,9 +246,18 @@ export function SessionsPage() {
   const allSessions = mockMode ? localSessions : (Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []);
   const filtered = allSessions.filter((session) => (!status || session.estado === status) && (!search || `${session.id} ${resolveServicioNombre(session, services)} ${resolveTutorNombre(session)}`.toLowerCase().includes(search.toLowerCase())));
   const transition = (session: Sesion, next: EstadoSesion) => {
+    // Para poder iniciar la sesión el backend exige un tutor, así que al asignar
+    // se usa el que ya tenga o, si no, el tutor del servicio.
+    const tutorId = next === 'ASIGNADA'
+      ? (session.tutorId ?? services.find((service) => service.id === session.servicioId)?.tutorNombre)
+      : undefined;
+    if (next === 'ASIGNADA' && !tutorId) {
+      toast({ title: 'No se pudo asignar', description: 'No se encontró un tutor para este servicio.', variant: 'destructive' });
+      return;
+    }
     if (mockMode) {
       try {
-        transitionLocalSession(session.id, next);
+        transitionLocalSession(session.id, next, tutorId);
         toast({
           title: 'Estado actualizado',
           description: `La sesión ${session.id} ahora está en estado ${statusLabels[next]}.`,
@@ -263,7 +272,7 @@ export function SessionsPage() {
       }
     } else {
       transitionMutation.mutate(
-        { id: session.id, data: { status: next } },
+        { id: session.id, data: { status: next, ...(tutorId ? { tutorId } : {}) } },
         {
           onSuccess: () => {
             toast({

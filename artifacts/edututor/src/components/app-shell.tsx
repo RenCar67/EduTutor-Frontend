@@ -19,7 +19,7 @@ type WorkspaceContextValue = {
   audit: EventoAuditoria[];
   createLocalService: (input: ServicioInput) => void;
   createLocalSession: (input: SesionInput) => void;
-  transitionLocalSession: (id: string, status: Sesion['estado']) => void;
+  transitionLocalSession: (id: string, status: Sesion['estado'], tutorId?: string) => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -76,7 +76,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }, ...current]);
   };
 
-  const transitionLocalSession = (id: string, status: Sesion['estado']) => {
+  const transitionLocalSession = (id: string, status: Sesion['estado'], tutorId?: string) => {
     const targetSession = sessions.find((s) => s.id === id);
     if (!targetSession) {
       throw new Error(`No se encontró la sesión ${id}`);
@@ -94,7 +94,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         `IllegalStateTransitionException: Transición inválida de ${targetSession.estado} a ${status}.`
       );
     }
-    setSessions((current) => current.map((session) => session.id === id ? { ...session, estado: status } : session));
+    setSessions((current) => current.map((session) => session.id === id
+      ? { ...session, estado: status, ...(tutorId ? { tutorId, tutorNombre: tutorId } : {}) }
+      : session));
   };
 
   const value = useMemo(() => ({
