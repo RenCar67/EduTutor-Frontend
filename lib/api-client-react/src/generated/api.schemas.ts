@@ -153,6 +153,35 @@ export interface EventoAuditoria {
   resultado: EventoAuditoriaResultado;
 }
 
+export interface KafkaParticion {
+  particion: number;
+  /** Siguiente offset a escribir: equivale a la cantidad de mensajes de la particion */
+  offsetFinal: number;
+}
+
+export interface KafkaGrupoParticion {
+  particion: number;
+  /** Hasta donde confirmo haber leido el grupo */
+  offsetActual: number;
+  offsetFinal: number;
+  /** offsetFinal - offsetActual: mensajes aun sin procesar */
+  lag: number;
+}
+
+export interface KafkaGrupo {
+  grupo: string;
+  lagTotal: number;
+  particiones: KafkaGrupoParticion[];
+}
+
+export interface KafkaStream {
+  topic: string;
+  particiones: number;
+  totalEventos: number;
+  detalle: KafkaParticion[];
+  grupos: KafkaGrupo[];
+}
+
 export interface ErrorResponse {
   error: string;
   message?: string;

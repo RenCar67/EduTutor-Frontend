@@ -297,6 +297,19 @@ paths:
                 items:
                   $ref: "#/components/schemas/EventoAuditoria"
 
+  /audit/kafka:
+    get:
+      operationId: getKafkaStream
+      tags: [audit]
+      summary: State of the sessions.events topic - end offset per partition and each consumer group's progress and lag
+      responses:
+        "200":
+          description: Topic and consumer groups state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KafkaStream"
+
 components:
   schemas:
     HealthStatus:
@@ -444,6 +457,45 @@ components:
         fechaTimestamp: { type: string, format: date-time }
         payloadJson: { type: object, additionalProperties: true }
         resultado: { type: string, enum: [EXITOSO, ERROR] }
+    KafkaParticion:
+      type: object
+      required: [particion, offsetFinal]
+      properties:
+        particion: { type: integer }
+        offsetFinal: { type: integer, description: "Siguiente offset a escribir: equivale a la cantidad de mensajes de la particion" }
+    KafkaGrupoParticion:
+      type: object
+      required: [particion, offsetActual, offsetFinal, lag]
+      properties:
+        particion: { type: integer }
+        offsetActual: { type: integer, description: "Hasta donde confirmo haber leido el grupo" }
+        offsetFinal: { type: integer }
+        lag: { type: integer, description: "offsetFinal - offsetActual: mensajes aun sin procesar" }
+    KafkaGrupo:
+      type: object
+      required: [grupo, lagTotal, particiones]
+      properties:
+        grupo: { type: string }
+        lagTotal: { type: integer }
+        particiones:
+          type: array
+          items:
+            $ref: "#/components/schemas/KafkaGrupoParticion"
+    KafkaStream:
+      type: object
+      required: [topic, particiones, totalEventos, detalle, grupos]
+      properties:
+        topic: { type: string }
+        particiones: { type: integer }
+        totalEventos: { type: integer }
+        detalle:
+          type: array
+          items:
+            $ref: "#/components/schemas/KafkaParticion"
+        grupos:
+          type: array
+          items:
+            $ref: "#/components/schemas/KafkaGrupo"
     ErrorResponse:
       type: object
       required: [error]

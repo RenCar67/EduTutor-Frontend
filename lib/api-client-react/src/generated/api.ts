@@ -25,6 +25,7 @@ import type {
   GetReportKpisParams,
   GetTopServicesParams,
   HealthStatus,
+  KafkaStream,
   ListAuditEventsParams,
   ListSessionsParams,
   ReportKpis,
@@ -1141,6 +1142,83 @@ export function useListAuditEventsBySession<TData = Awaited<ReturnType<typeof li
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListAuditEventsBySessionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetKafkaStreamUrl = () => {
+
+
+
+
+  return `/api/audit/kafka`
+}
+
+/**
+ * @summary State of the sessions.events topic - end offset per partition and each consumer group's progress and lag
+ */
+export const getKafkaStream = async ( options?: Parameters<typeof customFetch>[1]): Promise<KafkaStream> => {
+
+  return customFetch<KafkaStream>(getGetKafkaStreamUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetKafkaStreamQueryKey = () => {
+    return [
+    `/api/audit/kafka`
+    ] as const;
+    }
+
+
+export const getGetKafkaStreamQueryOptions = <TData = Awaited<ReturnType<typeof getKafkaStream>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKafkaStream>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetKafkaStreamQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getKafkaStream>>> = ({ signal }) => getKafkaStream({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getKafkaStream>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetKafkaStreamQueryResult = NonNullable<Awaited<ReturnType<typeof getKafkaStream>>>
+export type GetKafkaStreamQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary State of the sessions.events topic - end offset per partition and each consumer group's progress and lag
+ */
+
+export function useGetKafkaStream<TData = Awaited<ReturnType<typeof getKafkaStream>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKafkaStream>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetKafkaStreamQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

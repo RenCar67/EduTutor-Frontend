@@ -264,3 +264,27 @@ export const ListAuditEventsBySessionResponseItem = zod.object({
 export const ListAuditEventsBySessionResponse = zod.array(ListAuditEventsBySessionResponseItem)
 
 
+/**
+ * @summary State of the sessions.events topic - end offset per partition and each consumer group's progress and lag
+ */
+export const GetKafkaStreamResponse = zod.object({
+  "topic": zod.string(),
+  "particiones": zod.number().int(),
+  "totalEventos": zod.number().int(),
+  "detalle": zod.array(zod.object({
+  "particion": zod.number().int(),
+  "offsetFinal": zod.number().int().describe('Siguiente offset a escribir: equivale a la cantidad de mensajes de la particion')
+})),
+  "grupos": zod.array(zod.object({
+  "grupo": zod.string(),
+  "lagTotal": zod.number().int(),
+  "particiones": zod.array(zod.object({
+  "particion": zod.number().int(),
+  "offsetActual": zod.number().int().describe('Hasta donde confirmo haber leido el grupo'),
+  "offsetFinal": zod.number().int(),
+  "lag": zod.number().int().describe('offsetFinal - offsetActual: mensajes aun sin procesar')
+}))
+}))
+})
+
+
