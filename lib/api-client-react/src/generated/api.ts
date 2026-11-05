@@ -20,8 +20,10 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AlertaAnalitica,
   ErrorResponse,
   EventoAuditoria,
+  GetAnalyticsAlertsParams,
   GetReportKpisParams,
   GetTopServicesParams,
   HealthStatus,
@@ -981,6 +983,90 @@ export function useGetTopServices<TData = Awaited<ReturnType<typeof getTopServic
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetTopServicesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAnalyticsAlertsUrl = (params?: GetAnalyticsAlertsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/alerts?${stringifiedParams}` : `/api/report/alerts`
+}
+
+/**
+ * @summary Analytics alerts detected by audit (topic sessions.alerts) and stored by report, newest first
+ */
+export const getAnalyticsAlerts = async (params?: GetAnalyticsAlertsParams, options?: Parameters<typeof customFetch>[1]): Promise<AlertaAnalitica[]> => {
+
+  return customFetch<AlertaAnalitica[]>(getGetAnalyticsAlertsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAnalyticsAlertsQueryKey = (params?: GetAnalyticsAlertsParams,) => {
+    return [
+    `/api/report/alerts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAnalyticsAlertsQueryOptions = <TData = Awaited<ReturnType<typeof getAnalyticsAlerts>>, TError = ErrorType<unknown>>(params?: GetAnalyticsAlertsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAnalyticsAlertsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalyticsAlerts>>> = ({ signal }) => getAnalyticsAlerts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsAlerts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAnalyticsAlertsQueryResult = NonNullable<Awaited<ReturnType<typeof getAnalyticsAlerts>>>
+export type GetAnalyticsAlertsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Analytics alerts detected by audit (topic sessions.alerts) and stored by report, newest first
+ */
+
+export function useGetAnalyticsAlerts<TData = Awaited<ReturnType<typeof getAnalyticsAlerts>>, TError = ErrorType<unknown>>(
+ params?: GetAnalyticsAlertsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalyticsAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAnalyticsAlertsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

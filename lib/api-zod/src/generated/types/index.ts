@@ -6,12 +6,14 @@
  * OpenAPI spec version: 0.2.0
  */
 
+export * from './alertaAnalitica';
 export * from './errorResponse';
 export * from './estadoServicio';
 export * from './estadoSesion';
 export * from './eventoAuditoria';
 export * from './eventoAuditoriaPayloadJson';
 export * from './eventoAuditoriaResultado';
+export * from './getAnalyticsAlertsParams';
 export * from './getReportKpisParams';
 export * from './getTopServicesParams';
 export * from './healthStatus';

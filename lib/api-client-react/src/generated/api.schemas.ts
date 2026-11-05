@@ -182,6 +182,21 @@ export interface KafkaStream {
   grupos: KafkaGrupo[];
 }
 
+export interface AlertaAnalitica {
+  id: string;
+  regla: string;
+  severidad: string;
+  estudianteId: string;
+  sessionId?: number | null;
+  valor: number;
+  umbral: number;
+  ventanaDias?: number | null;
+  mensaje?: string | null;
+  detectadaEn: string;
+  kafkaParticion?: number | null;
+  kafkaOffset?: number | null;
+}
+
 export interface ErrorResponse {
   error: string;
   message?: string;
@@ -199,6 +214,10 @@ range?: string;
 
 export type GetTopServicesParams = {
 range?: string;
+};
+
+export type GetAnalyticsAlertsParams = {
+limit?: number;
 };
 
 export type ListAuditEventsParams = {

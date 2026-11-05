@@ -247,6 +247,28 @@ paths:
                 items:
                   $ref: "#/components/schemas/TopServicio"
 
+  /report/alerts:
+    get:
+      operationId: getAnalyticsAlerts
+      tags: [report]
+      summary: Analytics alerts detected by audit (topic sessions.alerts) and stored by report, newest first
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Most recent alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlertaAnalitica"
+
   # ==========================================================================
   # 4. AUDIT CONTROLLER (/api/audit/...)
   # ==========================================================================
@@ -496,6 +518,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/KafkaGrupo"
+    AlertaAnalitica:
+      type: object
+      required: [id, regla, severidad, estudianteId, valor, umbral, detectadaEn]
+      properties:
+        id: { type: string }
+        regla: { type: string }
+        severidad: { type: string }
+        estudianteId: { type: string }
+        sessionId: { type: integer, nullable: true }
+        valor: { type: integer }
+        umbral: { type: integer }
+        ventanaDias: { type: integer, nullable: true }
+        mensaje: { type: string, nullable: true }
+        detectadaEn: { type: string, format: date-time }
+        kafkaParticion: { type: integer, nullable: true }
+        kafkaOffset: { type: integer, nullable: true }
     ErrorResponse:
       type: object
       required: [error]

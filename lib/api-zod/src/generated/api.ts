@@ -226,6 +226,32 @@ export const GetTopServicesResponse = zod.array(GetTopServicesResponseItem)
 
 
 /**
+ * @summary Analytics alerts detected by audit (topic sessions.alerts) and stored by report, newest first
+ */
+export const getAnalyticsAlertsQueryLimitDefault = 50;
+
+export const GetAnalyticsAlertsQueryParams = zod.object({
+  "limit": zod.coerce.number().int().default(getAnalyticsAlertsQueryLimitDefault)
+})
+
+export const GetAnalyticsAlertsResponseItem = zod.object({
+  "id": zod.string(),
+  "regla": zod.string(),
+  "severidad": zod.string(),
+  "estudianteId": zod.string(),
+  "sessionId": zod.number().int().nullish(),
+  "valor": zod.number().int(),
+  "umbral": zod.number().int(),
+  "ventanaDias": zod.number().int().nullish(),
+  "mensaje": zod.string().nullish(),
+  "detectadaEn": zod.coerce.date(),
+  "kafkaParticion": zod.number().int().nullish(),
+  "kafkaOffset": zod.number().int().nullish()
+})
+export const GetAnalyticsAlertsResponse = zod.array(GetAnalyticsAlertsResponseItem)
+
+
+/**
  * @summary List audit trail events
  */
 export const ListAuditEventsQueryParams = zod.object({
